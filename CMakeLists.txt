@@ -68,8 +68,7 @@ message("二进制文件夹位置:${CMAKE_LIBRARY_OUTPUT_DIRECTORY} ")
 
 # 子目录
 add_subdirectory(Application)
-#add_subdirectory(Engine)
-#add_subdirectory(UnitTest)
+add_subdirectory(Renderer)
 
 ########################## 第三方库配置 ##########################
 
