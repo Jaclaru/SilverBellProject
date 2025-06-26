@@ -1,0 +1,77 @@
+cmake_minimum_required (VERSION 3.19 FATAL_ERROR)
+
+project(SilverBellEngine)
+
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
+endif()
+
+# 设置策略CMP0091为NEW，新策略
+if (POLICY CMP0091)
+  cmake_policy(SET CMP0091 NEW)
+endif (POLICY CMP0091)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# 判断操作系统类型
+if(WIN32)
+    # 如果是 Windows
+    message("当前操作系统为 Windows")
+    # 添加预定义宏
+    add_definitions(
+        -D__FORCEINLINE=__forceinline
+        -DNOMINMAX
+        -DPLATFORM_WINDOWS=1
+    )
+
+    add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+    add_compile_definitions(UNICODE _UNICODE)
+
+    #设置生成平台标记
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+        set(OPT_HINT Win64)
+    else()
+        set(OPT_HINT Win32)
+    endif()
+
+elseif(UNIX AND NOT APPLE)
+    # 如果是 Linux
+    message("当前操作系统为 Linux")
+    add_definitions(-D__ForceInline=inline)
+else()
+    message(FATAL_ERROR "不支持的操作系统类型")
+endif()
+
+
+# 判断当前的构建版本
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(BUILD_HINT Debug)
+else()
+    set(BUILD_HINT Release)
+endif()
+
+message("当前构建的版本是: ${BUILD_HINT}")
+message("当前构建的平台是: ${OPT_HINT}")
+
+########################## 项目配置 ##########################
+
+#set(SILVER_BELL_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+#set(CMAKE_INSTALL_PREFIX "${SILVER_BELL_ROOT_DIR}/bin")
+#set(BINARY_ROOT_DIR "${CMAKE_INSTALL_PREFIX}/")
+
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/Binaries)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/Binaries)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/Binaries)
+message("二进制文件夹位置:${CMAKE_LIBRARY_OUTPUT_DIRECTORY} ")
+
+# 子目录
+add_subdirectory(Application)
+#add_subdirectory(Engine)
+#add_subdirectory(UnitTest)
+
+########################## 第三方库配置 ##########################
+
+set(THIRD_PARTY_DIR ${PROJECT_SOURCE_DIR}/ThirdParty)
+set(THIRD_PARTY_LIB_DIR "Library/${OPT_HINT}/${BUILD_HINT}")
