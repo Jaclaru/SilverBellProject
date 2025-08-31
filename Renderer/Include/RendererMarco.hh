@@ -12,6 +12,8 @@
 
     #endif
 
+    #define VK_USE_PLATFORM_WIN32_KHR
+
 #else
 
     #define RENDERER_API

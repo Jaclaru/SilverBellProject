@@ -4,9 +4,9 @@
 
 #include <vector>
 
-namespace SilverBell::Render
+namespace SilverBell::Renderer
 {
-    class VulkanUtil
+    class FVulkanUtil
     {
     public:
 
@@ -26,7 +26,7 @@ namespace SilverBell::Render
         }
 
     private:
-        VulkanUtil() = default;
-        ~VulkanUtil() = default;
+        FVulkanUtil() = default;
+        ~FVulkanUtil() = default;
     };
 }

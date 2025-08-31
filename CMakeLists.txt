@@ -11,7 +11,7 @@ if (POLICY CMP0091)
   cmake_policy(SET CMP0091 NEW)
 endif (POLICY CMP0091)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -66,11 +66,17 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/Binaries)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/Binaries)
 message("二进制文件夹位置:${CMAKE_LIBRARY_OUTPUT_DIRECTORY} ")
 
-# 子目录
-add_subdirectory(Application)
-add_subdirectory(Renderer)
+
 
 ########################## 第三方库配置 ##########################
 
 set(THIRD_PARTY_DIR ${PROJECT_SOURCE_DIR}/ThirdParty)
 set(THIRD_PARTY_LIB_DIR "Library/${OPT_HINT}/${BUILD_HINT}")
+
+find_package(Qt6 COMPONENTS Core Gui Widgets REQUIRED)
+set(CMAKE_AUTOMOC ON)
+
+########################## 子目录 ##########################
+add_subdirectory(Application)
+add_subdirectory(Renderer)
+add_subdirectory(InternalLib)
