@@ -44,6 +44,9 @@ else()
     message(FATAL_ERROR "不支持的操作系统类型")
 endif()
 
+# 设置项目根目录宏，方便在代码中使用
+add_compile_definitions(PROJECT_ROOT_PATH="${CMAKE_SOURCE_DIR}/")
+
 
 # 判断当前的构建版本
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")

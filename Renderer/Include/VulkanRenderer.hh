@@ -19,11 +19,7 @@ namespace SilverBell::Renderer
 
         ~FVulkanRenderer();
 
-        void Initialize();
-
         void SetRequiredInstanceExtensions(const char** Exts, int Len);
-
-        void Resize();
 
         void CleanUp();
 
@@ -46,7 +42,7 @@ namespace SilverBell::Renderer
 
         struct SwapChainSupportDetails
         {
-            VkSurfaceCapabilitiesKHR Capabilities;
+            VkSurfaceCapabilitiesKHR Capabilities = {};
             std::vector<VkSurfaceFormatKHR> Formats;
             std::vector<VkPresentModeKHR> PresentModes;
         };
@@ -116,6 +112,8 @@ namespace SilverBell::Renderer
         VkRenderPass RenderPass;
         // Vulkan交换链帧缓冲
         std::vector<VkFramebuffer> SwapChainFramebuffers;
+        // Vulkan着色器模块
+        std::vector<VkShaderModule> ShaderModules;
         // Vulkan渲染管线
         VkPipeline GraphicsPipeline;
         // Vulkan渲染管线布局

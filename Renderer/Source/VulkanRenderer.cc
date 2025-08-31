@@ -1,11 +1,14 @@
 
 #define VOLK_IMPLEMENTATION
-#define VMA_IMPLEMENTATION
 
+#define VMA_VULKAN_VERSION 1001000
+#define VMA_IMPLEMENTATION
 #define VMA_STATIC_VULKAN_FUNCTIONS 0
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 0
 
 #include "VulkanRenderer.hh"
+
+#define USE_VULKAN_VERSION VK_API_VERSION_1_1
 
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 
@@ -123,24 +126,20 @@ FVulkanRenderer::FVulkanRenderer() :
     Surface(VK_NULL_HANDLE),
     SwapChain(VK_NULL_HANDLE),
     SwapChainImageFormat(VK_FORMAT_UNDEFINED),
-    SwapChainExtent({ 0, 0 })
+    SwapChainExtent({.width = 0, .height = 0 }),
+    RenderPass(VK_NULL_HANDLE),
+    GraphicsPipeline(VK_NULL_HANDLE),
+    PipelineLayout(VK_NULL_HANDLE),
+    CommandPool(VK_NULL_HANDLE),
+    ImageAvailableSemaphore(VK_NULL_HANDLE),
+    RenderFinishedSemaphore(VK_NULL_HANDLE),
+    MemoryAllocator(VMA_NULL)
 {
 }
 
 FVulkanRenderer::~FVulkanRenderer()
 {
     CleanUp();
-}
-
-void FVulkanRenderer::Initialize()
-{
-    CreateInstance();
-    if constexpr (EnableValidationLayers)
-    {
-        SetupDebugMessenger();
-    }
-    PickPhysicalDevice();
-    CreateLogicalDevice();
 }
 
 void FVulkanRenderer::SetRequiredInstanceExtensions(const char** Exts, int Len)
@@ -154,6 +153,7 @@ void FVulkanRenderer::SetRequiredInstanceExtensions(const char** Exts, int Len)
 
 void FVulkanRenderer::CleanUp()
 {
+    vkDeviceWaitIdle(LogicalDevice);
     if (DebugMessenger != VK_NULL_HANDLE)
     {
         vkDestroyDebugUtilsMessengerEXT(Instance, DebugMessenger, nullptr);
@@ -161,15 +161,30 @@ void FVulkanRenderer::CleanUp()
     }
 
     vkDestroySwapchainKHR(LogicalDevice, SwapChain, nullptr);
+    for (auto Framebuffer : SwapChainFramebuffers)
+    {
+        vkDestroyFramebuffer(LogicalDevice, Framebuffer, nullptr);
+    }
+    vkDestroyRenderPass(LogicalDevice, RenderPass, nullptr);
     for (auto ImageView : SwapChainImageViews)
     {
         vkDestroyImageView(LogicalDevice, ImageView, nullptr);
     }
+
+    // 销毁着色器模块
+    for (auto ShaderModule : ShaderModules)
+    {
+        vkDestroyShaderModule(LogicalDevice, ShaderModule, nullptr);
+    }
+
     vkDestroyPipeline(LogicalDevice, GraphicsPipeline, nullptr);
     vkDestroyPipelineLayout(LogicalDevice, PipelineLayout, nullptr);
     vkDestroyCommandPool(LogicalDevice, CommandPool, nullptr);
-    vkDestroyDevice(LogicalDevice, nullptr);
     vkDestroySurfaceKHR(Instance, Surface, nullptr);
+    vkDestroySemaphore(LogicalDevice, RenderFinishedSemaphore, nullptr);
+    vkDestroySemaphore(LogicalDevice, ImageAvailableSemaphore, nullptr);
+
+    vkDestroyDevice(LogicalDevice, nullptr);
 
     if (Instance != nullptr)
     {
@@ -181,7 +196,6 @@ void FVulkanRenderer::CleanUp()
 
 void FVulkanRenderer::DrawFrame()
 {
-
     vkQueueWaitIdle(PresentQueue);
 
     uint32_t ImageIndex;
@@ -228,9 +242,14 @@ void FVulkanRenderer::CreateInstance()
         return;
     }
 
-    if constexpr (EnableValidationLayers && !CheckValidationLayerSupport())
+    if constexpr (EnableValidationLayers)
     {
-        return;
+        if (!CheckValidationLayerSupport())
+        {
+            // 失败日志
+            std::cerr << "Validation layers requested, but not available!" << '\n';
+            return;
+        }
     }
 
     VkApplicationInfo AppInfo = {};
@@ -240,7 +259,7 @@ void FVulkanRenderer::CreateInstance()
     AppInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     AppInfo.pEngineName = "Silver Bell Engine";
     AppInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-    AppInfo.apiVersion = VK_API_VERSION_1_0;
+    AppInfo.apiVersion = USE_VULKAN_VERSION;
 
     VkInstanceCreateInfo InstanceCreateInfo = {};
     InstanceCreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -250,7 +269,7 @@ void FVulkanRenderer::CreateInstance()
 
     if (EnableValidationLayers)
     {
-        InstanceCreateInfo.enabledLayerCount = ValidationLayers.size();
+        InstanceCreateInfo.enabledLayerCount = static_cast<uint32_t>(ValidationLayers.size());
         InstanceCreateInfo.ppEnabledLayerNames = ValidationLayers.data();
         auto DebugCreateInfo = GetDebugMessengerCreateInfo();
         InstanceCreateInfo.pNext = &DebugCreateInfo;
@@ -360,14 +379,14 @@ bool FVulkanRenderer::CheckValidationLayerSupport()
     }
     std::vector<VkLayerProperties> AvailableLayers(LayerCount);
     vkEnumerateInstanceLayerProperties(&LayerCount, AvailableLayers.data());
+
+    // 这里不能用const char*来比较
+    std::unordered_set<std::string> RequiredLayers(ValidationLayers.begin(), ValidationLayers.end());
     for (const auto& Layer : AvailableLayers)
     {
-        if (strcmp(Layer.layerName, "VK_LAYER_KHRONOS_validation") == 0)
-        {
-            return true;
-        }
+        RequiredLayers.erase(Layer.layerName);
     }
-    return false;
+    return RequiredLayers.empty();
 }
 
 bool FVulkanRenderer::CheckDeviceExtensionSupport(VkPhysicalDevice Device)
@@ -389,6 +408,7 @@ bool FVulkanRenderer::CheckDeviceExtensionSupport(VkPhysicalDevice Device)
 
 void FVulkanRenderer::SetupDebugMessenger()
 {
+
     VkDebugUtilsMessengerCreateInfoEXT DebugCreateInfo = GetDebugMessengerCreateInfo();
     if (vkCreateDebugUtilsMessengerEXT(Instance, &DebugCreateInfo, nullptr, &DebugMessenger) != VK_SUCCESS)
     {
@@ -600,6 +620,9 @@ void FVulkanRenderer::CreateGraphicsPipeline()
     FragmentShaderStageInfo.pName = "Main"; // 入口点名称
     VkPipelineShaderStageCreateInfo ShaderStages[] = { VertexShaderStageInfo, FragmentShaderStageInfo };
 
+    ShaderModules.push_back(FragmentShaderModule);
+    ShaderModules.push_back(VertexShaderModule);
+
     // 顶点输入状态
     VkPipelineVertexInputStateCreateInfo VertexInputInfo = {};
     VertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -621,7 +644,7 @@ void FVulkanRenderer::CreateGraphicsPipeline()
     Viewport.minDepth = 0.0f;
     Viewport.maxDepth = 1.0f;
     VkRect2D Scissor = {};
-    Scissor.offset = { 0, 0 };
+    Scissor.offset = {.x = 0, .y = 0 };
     Scissor.extent = SwapChainExtent;
     VkPipelineViewportStateCreateInfo ViewportState = {};
     ViewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -767,7 +790,7 @@ void FVulkanRenderer::CreateCommandBuffers()
         RenderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
         RenderPassInfo.renderPass = RenderPass;
         RenderPassInfo.framebuffer = SwapChainFramebuffers[i];
-        RenderPassInfo.renderArea.offset = { 0, 0 };
+        RenderPassInfo.renderArea.offset = {.x = 0, .y = 0 };
         RenderPassInfo.renderArea.extent = SwapChainExtent;
         VkClearValue ClearColor = { {{0.0f, 0.0f, 0.0f, 1.0f}} }; // 清除颜色为黑色
         RenderPassInfo.clearValueCount = 1;
@@ -802,7 +825,7 @@ void FVulkanRenderer::CreateFramebuffers()
     {
         VkFramebufferCreateInfo CreateInfo = {};
         CreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        CreateInfo.renderPass = VK_NULL_HANDLE; // 需要先创建渲染通道
+        CreateInfo.renderPass = RenderPass;
         CreateInfo.attachmentCount = 1;
         CreateInfo.pAttachments = &SwapChainImageViews[i];
         CreateInfo.width = SwapChainExtent.width;
@@ -903,11 +926,11 @@ void FVulkanRenderer::CreateMemoryAllocator()
     VulkanFunctions.vkCreateImage = vkCreateImage;
     VulkanFunctions.vkDestroyImage = vkDestroyImage;
     VulkanFunctions.vkCmdCopyBuffer = vkCmdCopyBuffer;
-    // vulkanFunctions.vkGetBufferMemoryRequirements2KHR = vkGetBufferMemoryRequirements2KHR;
-    // vulkanFunctions.vkGetImageMemoryRequirements2KHR = vkGetImageMemoryRequirements2KHR;
-    // vulkanFunctions.vkBindBufferMemory2KHR = vkBindBufferMemory2KHR;
-    // vulkanFunctions.vkBindImageMemory2KHR = vkBindImageMemory2KHR;
-    // vulkanFunctions.vkGetPhysicalDeviceMemoryProperties2KHR = vkGetPhysicalDeviceMemoryProperties2KHR;
+    VulkanFunctions.vkGetBufferMemoryRequirements2KHR = vkGetBufferMemoryRequirements2KHR;
+    VulkanFunctions.vkGetImageMemoryRequirements2KHR = vkGetImageMemoryRequirements2KHR;
+    VulkanFunctions.vkBindBufferMemory2KHR = vkBindBufferMemory2KHR;
+    VulkanFunctions.vkBindImageMemory2KHR = vkBindImageMemory2KHR;
+    VulkanFunctions.vkGetPhysicalDeviceMemoryProperties2KHR = vkGetPhysicalDeviceMemoryProperties2KHR;
     VulkanFunctions.vkGetBufferMemoryRequirements2KHR = vkGetBufferMemoryRequirements2;
     VulkanFunctions.vkGetImageMemoryRequirements2KHR = vkGetImageMemoryRequirements2;
     VulkanFunctions.vkBindBufferMemory2KHR = vkBindBufferMemory2;
@@ -915,9 +938,13 @@ void FVulkanRenderer::CreateMemoryAllocator()
     VulkanFunctions.vkGetPhysicalDeviceMemoryProperties2KHR = vkGetPhysicalDeviceMemoryProperties2;
     VulkanFunctions.vkGetDeviceBufferMemoryRequirements = vkGetDeviceBufferMemoryRequirements;
     VulkanFunctions.vkGetDeviceImageMemoryRequirements = vkGetDeviceImageMemoryRequirements;
+#ifdef VK_USE_PLATFORM_WIN32_KHR
+    VulkanFunctions.vkGetMemoryWin32HandleKHR = vkGetMemoryWin32HandleKHR;
+#endif
+
 
     VmaAllocatorCreateInfo AllocatorCreateInfo = {};
-    AllocatorCreateInfo.vulkanApiVersion = VK_API_VERSION_1_0;
+    AllocatorCreateInfo.vulkanApiVersion = USE_VULKAN_VERSION;
     AllocatorCreateInfo.physicalDevice = PhysicalDevice;
     AllocatorCreateInfo.device = LogicalDevice;
     AllocatorCreateInfo.instance = Instance;

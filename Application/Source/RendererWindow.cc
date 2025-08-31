@@ -95,13 +95,17 @@ void FRendererWindow::InitializeVulkanRenderer()
     // 打印extensions
     for (const auto& ext : extensions) {
         qDebug() << "Supported Vulkan Extension:" << ext.name;
+        // 这个扩展用于嵌入式系统、特定硬件调试或多驱动环境，​并非所有 Vulkan 实现都支持，暂时跳过。
+        if (ext.name == "VK_LUNARG_direct_driver_loading")
+        {
+            continue;
+        }
         InstanceExtSet.insert(ext.name);
     }
 
     std::unique_ptr tRenderer = std::make_unique<FVulkanRenderer>();
     tRenderer->SetRequiredInstanceExtensions(std::vector(InstanceExtSet.begin(), InstanceExtSet.end()).data(), static_cast<int>(InstanceExtSet.size()));
     tRenderer->CreateInstance();
-
     tRenderer->CreateSurface((void*)this->winId());
     tRenderer->PickPhysicalDevice();
     tRenderer->CreateLogicalDevice();

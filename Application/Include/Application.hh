@@ -4,7 +4,6 @@
 
 namespace SilverBell::Application
 {
-
     // 程序主窗口
     class FApplication : public QMainWindow
     {

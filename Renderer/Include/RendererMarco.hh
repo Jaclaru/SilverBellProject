@@ -20,4 +20,4 @@
 
 #endif
 
-#define VULKAN_DEBUG_ENABLE 0
+#define VULKAN_DEBUG_ENABLE 1

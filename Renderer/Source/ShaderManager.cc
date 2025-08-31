@@ -8,12 +8,12 @@
 #include <iostream>
 #include <Volk/volk.h>
 
-namespace  fs = std::filesystem;
+namespace fs = std::filesystem;
 using namespace SilverBell::Renderer;
 
 namespace 
 {
-    std::string ProjectPath = "D:/SilverBellProject/";
+    std::string ProjectPath = PROJECT_ROOT_PATH;
 }
 
 namespace 
