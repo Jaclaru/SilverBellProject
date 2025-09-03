@@ -1,13 +1,22 @@
 #include "RendererWindow.hh"
 
 #include "VulkanRenderer.hh"
+
+#include <QDateTime>
+#include <QDebug>
+#include <QString>
+#include <QVulkanInstance>
+
+#include <spdlog/spdlog.h>
+
+#include <unordered_set>
+
+#include "Application.hh"
+#include "GlobalContext.hh"
+
 using namespace SilverBell::Renderer;
 using namespace SilverBell::Application;
 
-#include <QVulkanInstance>
-#include <QDebug>
-
-#include <unordered_set>
 namespace
 {
     std::vector InstanceExtensions =
@@ -17,6 +26,33 @@ namespace
         VK_KHR_WIN32_SURFACE_EXTENSION_NAME, // Windows平台
 #endif
     };
+}
+
+void FRendererThread::run()
+{
+    while (bRunning)
+    {
+        if (Renderer->DrawFrame())
+        {
+            // 帧率统计
+            static int FrameCount = 0;
+            static double LastTime = 0.0;
+            static double FPS = 0.0;
+            ++FrameCount;
+            double currentTime = QDateTime::currentMSecsSinceEpoch() / 1000.0;
+            if (LastTime == 0.0) LastTime = currentTime;
+
+            if (currentTime - LastTime >= 1.0) // 每秒统计一次
+            {
+
+                FPS = FrameCount / (currentTime - LastTime);
+                FrameCount = 0;
+                LastTime = currentTime;
+                emit UpdateFPS(FPS);
+            }
+        }
+        // msleep(16); // 控制帧率，约60FPS
+    }
 }
 
 FRendererWindow::FRendererWindow()
@@ -31,7 +67,11 @@ FRendererWindow::FRendererWindow()
 
 FRendererWindow::~FRendererWindow()
 {
-    
+    if (RenderThread)
+    {
+        RenderThread->Stop();
+        RenderThread->wait();
+    }
 }
 
 void FRendererWindow::exposeEvent(QExposeEvent*)
@@ -45,41 +85,24 @@ void FRendererWindow::exposeEvent(QExposeEvent*)
             InitializeVulkanRenderer();
             bInitialzed = true;
         }
-        Render();
     }
 }
 
 void FRendererWindow::Render()
 {
-    if (Renderer == nullptr)return;
+    if (Renderer == nullptr) return;
 
-    Renderer->DrawFrame();
-    requestUpdate();
-}
+    // 这里存在一个bug.由于这里做的递归requestUpdate
+    // 窗口大小变化时，Qt 会频繁发送重绘/刷新事件，如 QEvent::UpdateRequest，
+    // 形成“自激”渲染循环，导致 Render() 被高频调用。
+    // 这会引发性能问题，甚至导致应用程序无响应。
+    // 已改完通过渲染线程持续渲染
 
-bool FRendererWindow::event(QEvent* Event)
-{
-    switch (Event->type()) {
-    case QEvent::UpdateRequest:
-        Render();
-        break;
-
-        // The swapchain must be destroyed before the surface as per spec. This is
-        // not ideal for us because the surface is managed by the QPlatformWindow
-        // which may be gone already when the unexpose comes, making the validation
-        // layer scream. The solution is to listen to the PlatformSurface events.
-    //case QEvent::PlatformSurface:
-    //    if (static_cast<QPlatformSurfaceEvent*>(e)->surfaceEventType() == QPlatformSurfaceEvent::SurfaceAboutToBeDestroyed) {
-    //        d->releaseSwapChain();
-    //        d->reset();
-    //    }
-    //    break;
-
-    default:
-        break;
+    // 成功绘制一帧后继续请求下一帧
+    if (Renderer->DrawFrame())
+    {
+        requestUpdate();
     }
-
-    return QWindow::event(Event);
 }
 
 void FRendererWindow::InitializeVulkanRenderer()
@@ -87,8 +110,6 @@ void FRendererWindow::InitializeVulkanRenderer()
     // 获取QT需要的vulkan 扩展
     QVulkanInstance tQVulkanInstance;
     tQVulkanInstance.create();
-
-    // 获取 Qt 需要的 Vulkan 扩展
     auto extensions = tQVulkanInstance.supportedExtensions();
 
     std::unordered_set InstanceExtSet(InstanceExtensions.begin(), InstanceExtensions.end());
@@ -119,6 +140,15 @@ void FRendererWindow::InitializeVulkanRenderer()
     tRenderer->CreateSemaphores();
 
     Renderer = std::move(tRenderer);
+
+    // 启动渲染线程
+    RenderThread = std::make_unique<FRendererThread>(Renderer.get());
+    RenderThread->start();
+    // 连接信号槽，更新FPS显示
+    if (FApplication* MainWindow = GlobalContext::Instance().GetMainWindow())
+    {
+        connect(RenderThread.get(), &FRendererThread::UpdateFPS, MainWindow, &FApplication::OnUpdateFPS);
+    }
 }
 
 //FRenderWidget::FRenderWidget(QWidget* Parent)

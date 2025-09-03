@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QThread>
 #include <QWindow>
 #include <QWidget>
 
@@ -12,19 +13,42 @@ namespace SilverBell::Renderer
 
 namespace SilverBell::Application
 {
+
+    class FRendererThread : public QThread
+    {
+        Q_OBJECT
+    public:
+        FRendererThread(SilverBell::Renderer::FVulkanRenderer* renderer, QObject* parent = nullptr)
+            : QThread(parent), Renderer(renderer), bRunning(true)
+        {
+        }
+
+        void run() override;
+
+        void Stop() { bRunning = false; }
+
+    signals:
+
+        void UpdateFPS(double iFPS);
+
+    private:
+        Renderer::FVulkanRenderer* Renderer;
+        std::atomic<bool> bRunning;
+    };
+
     class FRendererWindow : public QWindow
     {
         Q_OBJECT
     public:
 
         FRendererWindow();
-        ~FRendererWindow();
+        ~FRendererWindow() override;
 
         void exposeEvent(QExposeEvent*) override;
 
         void Render();
 
-        bool event(QEvent* Event) override;
+        //bool event(QEvent* Event) override;
 
     private:
 
@@ -33,15 +57,17 @@ namespace SilverBell::Application
         std::unique_ptr<Renderer::FVulkanRenderer> Renderer;
 
         bool bInitialzed;
+
+        std::unique_ptr<FRendererThread> RenderThread;
     };
 
-    class FRenderWidget : public QWidget
-    {
-        Q_OBJECT
+    //class FRenderWidget : public QWidget
+    //{
+    //    Q_OBJECT
 
-    public:
-        FRenderWidget(QWidget* Parent);
-        ~FRenderWidget() override;
-    };
+    //public:
+    //    FRenderWidget(QWidget* Parent);
+    //    ~FRenderWidget() override;
+    //};
 
 }

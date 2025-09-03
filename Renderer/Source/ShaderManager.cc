@@ -1,12 +1,14 @@
 #include "ShaderManager.hh"
 
-#include <fstream>
 //#include <stdexcept>
 //#include <glslang/Public/ShaderLang.h>
 //#include <glslang/SPIRV/GlslangToSpv.h>
 
-#include <iostream>
 #include <Volk/volk.h>
+
+#include <spdlog/spdlog.h>
+
+#include <fstream>
 
 namespace fs = std::filesystem;
 using namespace SilverBell::Renderer;
@@ -21,13 +23,13 @@ namespace
     std::vector<char> ReadFile(const std::string& FilePath)
     {
         // 打印当前工作目录，便于调试
-        std::cout << "Current working directory: " << fs::current_path() << std::endl;
+        //std::cout << "Current working directory: " << fs::current_path() << std::endl;
 
-
-        std::ifstream File(ProjectPath + FilePath, std::ios::binary | std::ios::ate);
+        std::ifstream File(FilePath, std::ios::binary | std::ios::ate);
 
         if (!File.is_open())
         {
+            spdlog::error("打开文件失败: {}", FilePath);
             throw std::runtime_error("Failed to open file: " + FilePath);
         }
 
@@ -36,6 +38,7 @@ namespace
         File.seekg(0);
         if (!File.read(Buffer.data(), Size))
         {
+            spdlog::error("读入文件失败: {}", FilePath);
             throw std::runtime_error("Failed to read file: " + FilePath);
         }
         File.close();
@@ -52,6 +55,7 @@ namespace
         VkShaderModule ShaderModule;
         if (vkCreateShaderModule(Device, &CreateInfo, nullptr, &ShaderModule) != VK_SUCCESS)
         {
+            spdlog::error("创建着色器模块失败");
             throw std::runtime_error("Failed to create shader module");
         }
         return ShaderModule;
@@ -217,7 +221,8 @@ VkShaderModule FShaderManager::CreateShaderModule(const std::string& FilePath, c
     //    return finder->second; // 如果缓存中存在，直接返回
     //}
 
-    auto ShaderCode = ReadFile(FilePath);
+    const std::string CompletePath = ProjectPath + FilePath;
+    auto ShaderCode = ReadFile(CompletePath);
 
     VkShaderModuleCreateInfo CreateInfo = {};
     CreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -227,14 +232,14 @@ VkShaderModule FShaderManager::CreateShaderModule(const std::string& FilePath, c
     VkShaderModule ShaderModule;
     if (vkCreateShaderModule(LogicDevice, &CreateInfo, nullptr, &ShaderModule) != VK_SUCCESS)
     {
-        throw std::runtime_error("Failed to create shader module from file: " + FilePath);
+        spdlog::error("创建着色器模块失败，失败文件: {}", CompletePath);
+        throw std::runtime_error("Failed to create shader module from file: " + CompletePath);
     }
     // 这里可以将ShaderModule存储在一个map中，以便后续使用
     // ShaderCache[ShaderType] = QString::fromStdString(FilePath); // 缓存文件路径
     // 注意：如果需要在后续使用ShaderModule时销毁它，请确保在适当的时候调用vkDestroyShaderModule
     // 例如，在渲染器清理时销毁所有ShaderModule
     // 这里可以将ShaderModule存储在一个map中，以便后续使用
-
 
     return ShaderModule;
 }

@@ -3,7 +3,7 @@ cmake_minimum_required (VERSION 3.19 FATAL_ERROR)
 project(SilverBellEngine)
 
 if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
+    set(CMAKE_BUILD_TYPE Debug)
 endif()
 
 # 设置策略CMP0091为NEW，新策略
@@ -78,6 +78,13 @@ set(THIRD_PARTY_LIB_DIR "Library/${OPT_HINT}/${BUILD_HINT}")
 
 find_package(Qt6 COMPONENTS Core Gui Widgets REQUIRED)
 set(CMAKE_AUTOMOC ON)
+
+# spdlog
+set(SPDLOG_INCLUDE_DIR "${THIRD_PARTY_DIR}/spdlog-1.15.3/Include" CACHE INTERNAL "spdlog Include")
+set(SPDLOG_LIBRARY_DIR "${THIRD_PARTY_DIR}/spdlog-1.15.3/${THIRD_PARTY_LIB_DIR}" CACHE INTERNAL "spdlog Library")
+file(GLOB SPDLOG_DLL_FILES ${SPDLOG_LIBRARY_DIR}/*.dll)
+message("spdlog库文件位置: ${SPDLOG_LIBRARY_DIR}")
+message("spdloag库头文件位置: ${SPDLOG_INCLUDE_DIR}")
 
 ########################## 子目录 ##########################
 add_subdirectory(Application)

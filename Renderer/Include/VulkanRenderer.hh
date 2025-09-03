@@ -23,7 +23,7 @@ namespace SilverBell::Renderer
 
         void CleanUp();
 
-        void DrawFrame();
+        bool DrawFrame();
 
         void CreateSurface(void* WindowHandle);
 
