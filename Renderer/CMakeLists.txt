@@ -26,5 +26,6 @@ target_link_libraries(Renderer PRIVATE ${Vulkan_LIBRARIES})
 # 链接 spdlog
 target_include_directories(Renderer PRIVATE ${SPDLOG_INCLUDE_DIR})
 target_link_directories(Renderer PRIVATE ${SPDLOG_LIBRARY_DIR})
+target_link_libraries(Renderer PRIVATE  debug spdlogd optimized spdlog)
 
 endif()

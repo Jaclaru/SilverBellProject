@@ -11,6 +11,4 @@ target_link_libraries(Application PRIVATE Qt6::Widgets)
 # 链接 spdlog
 target_include_directories(Application PRIVATE ${SPDLOG_INCLUDE_DIR})
 target_link_directories(Application PRIVATE ${SPDLOG_LIBRARY_DIR})
-
-
 target_link_libraries(Application PRIVATE  debug spdlogd optimized spdlog)

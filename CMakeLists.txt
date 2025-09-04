@@ -47,6 +47,9 @@ endif()
 # 设置项目根目录宏，方便在代码中使用
 add_compile_definitions(PROJECT_ROOT_PATH="${CMAKE_SOURCE_DIR}/")
 
+# spdlog 使用动态库
+add_compile_definitions(SPDLOG_COMPILED_LIB)
+
 
 # 判断当前的构建版本
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
