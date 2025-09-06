@@ -44,6 +44,8 @@ else()
     message(FATAL_ERROR "不支持的操作系统类型")
 endif()
 
+include(FetchContent)
+
 # 设置项目根目录宏，方便在代码中使用
 add_compile_definitions(PROJECT_ROOT_PATH="${CMAKE_SOURCE_DIR}/")
 
@@ -72,8 +74,6 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/Binaries)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/Binaries)
 message("二进制文件夹位置:${CMAKE_LIBRARY_OUTPUT_DIRECTORY} ")
 
-
-
 ########################## 第三方库配置 ##########################
 
 set(THIRD_PARTY_DIR ${PROJECT_SOURCE_DIR}/ThirdParty)
@@ -88,6 +88,18 @@ set(SPDLOG_LIBRARY_DIR "${THIRD_PARTY_DIR}/spdlog-1.15.3/${THIRD_PARTY_LIB_DIR}"
 file(GLOB SPDLOG_DLL_FILES ${SPDLOG_LIBRARY_DIR}/*.dll)
 message("spdlog库文件位置: ${SPDLOG_LIBRARY_DIR}")
 message("spdloag库头文件位置: ${SPDLOG_INCLUDE_DIR}")
+
+# Eigen
+set(EIGEN_INCLUDE_DIR "${THIRD_PARTY_DIR}/Eigen/Include" CACHE INTERNAL "Eigen Include")
+
+# yalantinglibs
+FetchContent_Declare(
+    yalantinglibs
+    GIT_REPOSITORY https://github.com/alibaba/yalantinglibs.git
+    GIT_TAG 0.5.5
+    GIT_SHALLOW 1 # optional ( --depth=1 )
+)
+FetchContent_MakeAvailable(yalantinglibs)
 
 ########################## 子目录 ##########################
 add_subdirectory(Application)

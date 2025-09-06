@@ -65,11 +65,16 @@ namespace SilverBell::Renderer
 
         void CreateCommandPool();
 
+        void CreateVertexBuffers();
+
         void CreateCommandBuffers();
 
         void CreateSemaphores();
 
-    private:
+        void RecreateSwapChain(int Width, int Height);
+
+        void CleanupSwapChain();
+
         bool IsDeviceSuitable(VkPhysicalDevice Device);
 
         bool CheckValidationLayerSupport();
@@ -125,6 +130,10 @@ namespace SilverBell::Renderer
         // 信号量
         VkSemaphore ImageAvailableSemaphore;
         VkSemaphore RenderFinishedSemaphore;
+        // 顶点缓冲
+        std::vector<VkBuffer> VertexBuffers;
+        std::vector<VmaAllocation> VertexBufferAllocations;
+        std::vector<VmaAllocationInfo> VertexBufferAllocationInfos;
 
         // VMA内存分配
         VmaAllocator MemoryAllocator;

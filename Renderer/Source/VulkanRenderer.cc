@@ -21,8 +21,11 @@
 #include <vector>
 
 #include "ShaderManager.hh"
+#include "RenderResource.hh"
 
 #include <spdlog/spdlog.h>
+
+#include "Mesh.hh"
 
 using namespace SilverBell::Renderer;
 
@@ -41,7 +44,9 @@ namespace
 
     const std::vector<const char*> DeviceExtensions =
     {
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME,
+        VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME,
     };
 
     VkDebugUtilsMessengerCreateInfoEXT GetDebugMessengerCreateInfo()
@@ -89,10 +94,11 @@ namespace
 
     VkPresentModeKHR ChooseSwapPresentMode(const std::vector<VkPresentModeKHR>& AvailablePresentModes)
     {
-        VkPresentModeKHR BestMode = VK_PRESENT_MODE_IMMEDIATE_KHR; // 默认使用 FIFO 模式
+        VkPresentModeKHR BestMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
 
         for (const auto& Mode : AvailablePresentModes)
         {
+            // 默认使用 FIFO 模式
             if (Mode == VK_PRESENT_MODE_FIFO_KHR)
             {
                 return Mode;
@@ -151,6 +157,8 @@ void FVulkanRenderer::SetRequiredInstanceExtensions(const char** Exts, int Len)
     {
         InstanceExtensions.push_back(Exts[Idx]);
     }
+
+    //InstanceExtensions.push_back("VK_KHR_buffer_device_address");
 }
 
 void FVulkanRenderer::CleanUp()
@@ -161,39 +169,30 @@ void FVulkanRenderer::CleanUp()
         vkDestroyDebugUtilsMessengerEXT(Instance, DebugMessenger, nullptr);
         DebugMessenger = VK_NULL_HANDLE;
     }
-
-    vkDestroySwapchainKHR(LogicalDevice, SwapChain, nullptr);
-    for (auto Framebuffer : SwapChainFramebuffers)
-    {
-        vkDestroyFramebuffer(LogicalDevice, Framebuffer, nullptr);
-    }
-    vkDestroyRenderPass(LogicalDevice, RenderPass, nullptr);
-    for (auto ImageView : SwapChainImageViews)
-    {
-        vkDestroyImageView(LogicalDevice, ImageView, nullptr);
-    }
-
+    CleanupSwapChain();
     // 销毁着色器模块
     for (auto ShaderModule : ShaderModules)
     {
         vkDestroyShaderModule(LogicalDevice, ShaderModule, nullptr);
     }
-
-    vkDestroyPipeline(LogicalDevice, GraphicsPipeline, nullptr);
-    vkDestroyPipelineLayout(LogicalDevice, PipelineLayout, nullptr);
-    vkDestroyCommandPool(LogicalDevice, CommandPool, nullptr);
-    vkDestroySurfaceKHR(Instance, Surface, nullptr);
     vkDestroySemaphore(LogicalDevice, RenderFinishedSemaphore, nullptr);
     vkDestroySemaphore(LogicalDevice, ImageAvailableSemaphore, nullptr);
+    vkDestroyCommandPool(LogicalDevice, CommandPool, nullptr);
+
+    // 销毁顶点缓冲区
+    for (int Idx = 0; Idx < VertexBuffers.size(); ++Idx)
+    {
+        vmaDestroyBuffer(MemoryAllocator, VertexBuffers[Idx], VertexBufferAllocations[Idx]);
+    }
+    vmaDestroyAllocator(MemoryAllocator);
 
     vkDestroyDevice(LogicalDevice, nullptr);
-
+    vkDestroySurfaceKHR(Instance, Surface, nullptr);
     if (Instance != nullptr)
     {
         vkDestroyInstance(Instance, nullptr);
         Instance = nullptr;
     }
-
 }
 
 bool FVulkanRenderer::DrawFrame()
@@ -204,14 +203,23 @@ bool FVulkanRenderer::DrawFrame()
     auto Result = vkAcquireNextImageKHR(LogicalDevice, SwapChain, std::numeric_limits<uint64_t>::max(), ImageAvailableSemaphore, VK_NULL_HANDLE, &ImageIndex);
 
     // TODO ： 未实现Resize处理，窗口大小变化时会报错
-    static std::uint32_t ErrorCount = 0;
+    static VkResult LastError;
     if (Result != VK_SUCCESS)
     {
-        ++ErrorCount;
-        // 连续200次获取失败则输出错误日志
-        if (ErrorCount >= 200)
+        if (Result != LastError)
         {
-            spdlog::error("连续200次获取交换链图像失败！错误计数：{}", ErrorCount);
+            LastError = Result;
+            switch (LastError)  // NOLINT(clang-diagnostic-switch-enum)
+            {
+            case VK_ERROR_OUT_OF_DATE_KHR:
+                spdlog::warn("交换链过时，需要重新创建！已停止渲染！");
+                break;
+            case VK_SUBOPTIMAL_KHR:
+                spdlog::warn("交换链仍然可以向surface提交图像，但是surface的属性不再匹配准确！");
+                break;
+            default:
+                spdlog::error("交换链发生未知错误！");
+            }
         }
         return false;
     }
@@ -246,7 +254,6 @@ bool FVulkanRenderer::DrawFrame()
     PresentInfo.pResults = nullptr; // Optional
     vkQueuePresentKHR(PresentQueue, &PresentInfo);
 
-    ErrorCount = 0;
     return true;
 }
 
@@ -478,6 +485,10 @@ void FVulkanRenderer::CreateLogicalDevice()
         QueueCreateInfos.push_back(QueueCreateInfo);
     }
 
+    VkPhysicalDeviceBufferDeviceAddressFeaturesKHR bufferDeviceAddressFeatures{};
+    bufferDeviceAddressFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES_KHR;
+    bufferDeviceAddressFeatures.bufferDeviceAddress = VK_TRUE; // 明确启用设备地址特性
+
     // 指定使用的设备特性
     VkPhysicalDeviceFeatures DeviceFeatures = {};
     DeviceFeatures.geometryShader = VK_TRUE; // 启用几何着色器
@@ -489,6 +500,7 @@ void FVulkanRenderer::CreateLogicalDevice()
     DeviceCreateInfo.queueCreateInfoCount = static_cast<uint32_t>(QueueCreateInfos.size());
     DeviceCreateInfo.pQueueCreateInfos = QueueCreateInfos.data();
     DeviceCreateInfo.pEnabledFeatures = &DeviceFeatures;
+    DeviceCreateInfo.pNext = &bufferDeviceAddressFeatures; // 链接设备特性结构体
 
     DeviceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(DeviceExtensions.size());
     DeviceCreateInfo.ppEnabledExtensionNames = DeviceExtensions.data();
@@ -669,13 +681,16 @@ void FVulkanRenderer::CreateGraphicsPipeline()
     ShaderModules.push_back(FragmentShaderModule);
     ShaderModules.push_back(VertexShaderModule);
 
+
+    auto AttributeDescriptions = GetAttributeDescriptions<Assets::BaseMesh>();
+    auto BindingBindingDescriptions = GetBindingDescriptions<Assets::BaseMesh>();
     // 顶点输入状态
     VkPipelineVertexInputStateCreateInfo VertexInputInfo = {};
     VertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    VertexInputInfo.vertexBindingDescriptionCount = 0; // 如果没有顶点绑定描述符
-    VertexInputInfo.pVertexBindingDescriptions = nullptr; // 没有顶点绑定描述符
-    VertexInputInfo.vertexAttributeDescriptionCount = 0; // 如果没有顶点属性描述符
-    VertexInputInfo.pVertexAttributeDescriptions = nullptr; // 没有顶点属性描述符
+    VertexInputInfo.vertexBindingDescriptionCount = static_cast<uint32_t>(BindingBindingDescriptions.size()); // 如果没有顶点绑定描述符
+    VertexInputInfo.pVertexBindingDescriptions = BindingBindingDescriptions.data(); // 没有顶点绑定描述符
+    VertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(AttributeDescriptions.size()); // 如果没有顶点属性描述符
+    VertexInputInfo.pVertexAttributeDescriptions = AttributeDescriptions.data(); // 没有顶点属性描述符
     // 输入装配状态
     VkPipelineInputAssemblyStateCreateInfo InputAssembly = {};
     InputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -812,6 +827,43 @@ void FVulkanRenderer::CreateCommandPool()
     }
 }
 
+void FVulkanRenderer::CreateVertexBuffers()
+{
+    auto BufferInfos = GetCreateBufferInfos(Assets::TestTriangleMesh, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+
+    VertexBuffers.resize(BufferInfos.size());
+    VertexBufferAllocations.resize(BufferInfos.size());
+    VertexBufferAllocationInfos.resize(BufferInfos.size());
+    for (size_t Idx = 0; Idx < BufferInfos.size(); ++Idx)
+    {
+        VmaAllocationCreateInfo AllocCreateInfo = {};
+        AllocCreateInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+        AllocCreateInfo.flags = 0;/*VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |*/ /*VMA_ALLOCATION_CREATE_MAPPED_BIT*/;
+
+        if (vmaCreateBuffer(MemoryAllocator, 
+                            &BufferInfos[Idx],
+                            &AllocCreateInfo,
+                            &VertexBuffers[Idx],
+                            &VertexBufferAllocations[Idx],
+                            &VertexBufferAllocationInfos[Idx]) != VK_SUCCESS)
+        {
+            spdlog::error("创建顶点缓冲区失败！");
+            throw std::runtime_error("Failed to create vertex buffer!");
+        }
+    }
+
+    // 写入顶点数据
+    void* Data = nullptr;
+    vmaMapMemory(MemoryAllocator, VertexBufferAllocations[0], &Data);
+    std::memcpy(Data, (void*)Assets::TestTriangleMesh.Positions.data(), BufferInfos[0].size);
+    vmaUnmapMemory(MemoryAllocator, VertexBufferAllocations[0]);
+
+    Data = nullptr;
+    vmaMapMemory(MemoryAllocator, VertexBufferAllocations[1], &Data);
+    std::memcpy(Data, (void*)Assets::TestTriangleMesh.Color.data(), BufferInfos[1].size);
+    vmaUnmapMemory(MemoryAllocator, VertexBufferAllocations[1]);
+}
+
 void FVulkanRenderer::CreateCommandBuffers()
 {
     CommandBuffers.resize(SwapChainFramebuffers.size());
@@ -847,6 +899,11 @@ void FVulkanRenderer::CreateCommandBuffers()
         RenderPassInfo.clearValueCount = 1;
         RenderPassInfo.pClearValues = &ClearColor;
         vkCmdBindPipeline(CommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, GraphicsPipeline);
+
+        // 绑定顶点缓冲区
+        VkDeviceSize OffSets[] = {0, 0};
+        vkCmdBindVertexBuffers(CommandBuffers[i], 0, static_cast<uint32_t>(VertexBuffers.size()), VertexBuffers.data(), OffSets);
+
         vkCmdBeginRenderPass(CommandBuffers[i], &RenderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
         vkCmdDraw(CommandBuffers[i], 3, 1, 0, 0); // 绘制一个三角形
         vkCmdEndRenderPass(CommandBuffers[i]);
@@ -868,6 +925,41 @@ void FVulkanRenderer::CreateSemaphores()
         spdlog::error("创建信号量失败！");
         throw std::runtime_error("Failed to create semaphores!");
     }
+}
+
+void FVulkanRenderer::RecreateSwapChain(int Width, int Height)
+{
+    vkDeviceWaitIdle(LogicalDevice);
+
+    CleanupSwapChain();
+
+    CreateSwapChain(Width, Height);
+    CreateImageViews();
+    CreateRenderPass();
+    CreateGraphicsPipeline();
+    CreateFramebuffers();
+    CreateCommandBuffers();
+}
+
+void FVulkanRenderer::CleanupSwapChain()
+{
+    for (auto Framebuffer : SwapChainFramebuffers)
+    {
+        vkDestroyFramebuffer(LogicalDevice, Framebuffer, nullptr);
+    }
+
+    vkFreeCommandBuffers(LogicalDevice, CommandPool, static_cast<uint32_t>(CommandBuffers.size()), CommandBuffers.data());
+
+    vkDestroyPipeline(LogicalDevice, GraphicsPipeline, nullptr);
+    vkDestroyPipelineLayout(LogicalDevice, PipelineLayout, nullptr);
+    vkDestroyRenderPass(LogicalDevice, RenderPass, nullptr);
+
+    for (auto ImageView : SwapChainImageViews)
+    {
+        vkDestroyImageView(LogicalDevice, ImageView, nullptr);
+    }
+
+    vkDestroySwapchainKHR(LogicalDevice, SwapChain, nullptr);
 }
 
 void FVulkanRenderer::CreateFramebuffers()

@@ -1,9 +1,9 @@
 
-//struct VSInput
-//{
-//    float3 Pos : POSITION0;
-//    float3 Color : COLOR0;
-//};
+struct VSInput
+{
+    float3 Pos : POSITION;
+    float3 Color : COLOR;
+};
 
 struct VSOutput
 {
@@ -23,10 +23,10 @@ static const float3 Color[3] = {
     float3(0.0f, 0.0f, 1.0f)
 };
 
-VSOutput Main(uint index : SV_VertexID)
+VSOutput Main(VSInput Input)
 {
-    VSOutput output = (VSOutput)0;
-    output.Pos = float4(Position[index], 0.0f, 1.0f);
-    output.Color = Color[index];
+    VSOutput output;
+    output.Pos = float4(Input.Pos, 1.0f);
+    output.Color = Input.Color;
     return output;
 }
