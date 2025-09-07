@@ -44,8 +44,6 @@ else()
     message(FATAL_ERROR "不支持的操作系统类型")
 endif()
 
-include(FetchContent)
-
 # 设置项目根目录宏，方便在代码中使用
 add_compile_definitions(PROJECT_ROOT_PATH="${CMAKE_SOURCE_DIR}/")
 
@@ -93,6 +91,7 @@ message("spdloag库头文件位置: ${SPDLOG_INCLUDE_DIR}")
 set(EIGEN_INCLUDE_DIR "${THIRD_PARTY_DIR}/Eigen/Include" CACHE INTERNAL "Eigen Include")
 
 # yalantinglibs
+include(FetchContent)
 FetchContent_Declare(
     yalantinglibs
     GIT_REPOSITORY https://github.com/alibaba/yalantinglibs.git

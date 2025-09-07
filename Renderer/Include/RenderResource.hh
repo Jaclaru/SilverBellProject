@@ -106,32 +106,77 @@ namespace SilverBell::Renderer
         return GetBindingDescriptions(T{});
     }
 
-    // 获取顶点绑定描述
-    template<typename T, std::size_t I = ylt::reflection::members_count_v<T>>
-    [[nodiscard]] std::array<VkBufferCreateInfo, I> GetCreateBufferInfos(const T& iDataSource, VkBufferUsageFlagBits Bits)
+    struct VkBufferCache
     {
-        std::array<VkBufferCreateInfo, I> BufferInfoArray = {};
-        ylt::reflection::for_each(iDataSource, [&BufferInfoArray, Bits](auto& Field, auto Name, auto Index)
-        {
-            using MemberType = std::remove_cvref_t<decltype(Field)>;
+        VkDeviceSize BufferSize = 0;
+        VkBuffer Buffer = VK_NULL_HANDLE;
+        VmaAllocation Allocation = VK_NULL_HANDLE;
+        VmaAllocationInfo AllocationInfo = {};
+    };
 
-            size_t ValueSize;
-            if constexpr (requires { typename MemberType::value_type; Field.size(); })
-            {
-                ValueSize = sizeof(typename MemberType::value_type) * Field.size();
-            }
-            else
-            {
-                ValueSize = sizeof(MemberType);
-            }
-            VkBufferCreateInfo& BufferInfo = BufferInfoArray[Index];
-            BufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-            BufferInfo.size = ValueSize;
-            BufferInfo.usage = Bits;
-            BufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-            BufferInfo.flags = 0;
-        });
+    // 创建缓冲区，返回每个成员对应的缓冲区数组
+    template<typename T, std::size_t I = ylt::reflection::members_count_v<T>>
+    [[nodiscard]] std::vector<VkBufferCache> CreateBuffer(const T& iDataSource,
+                                                         VmaAllocator MemoryAllocator,   
+                                                         VkBufferUsageFlagBits VkBufferUsageFlagBits,
+                                                         VmaMemoryUsage VmaUsageBits, 
+                                                         VmaAllocationCreateFlags VmaCreateFlagsBits)
+    {
+        std::vector<VkBufferCache> BufferCaches;
+        BufferCaches.resize(I);
 
-        return BufferInfoArray;
+        ylt::reflection::for_each(iDataSource, 
+            [&BufferCaches, &MemoryAllocator, VkBufferUsageFlagBits, VmaUsageBits, VmaCreateFlagsBits]
+            (auto& Field, auto Name, auto Index)
+            {
+                using MemberType = std::remove_cvref_t<decltype(Field)>;
+
+                size_t ValueSize;
+                if constexpr (requires { typename MemberType::value_type; Field.size(); })
+                {
+                    ValueSize = sizeof(typename MemberType::value_type) * Field.size();
+                }
+                else
+                {
+                    ValueSize = sizeof(MemberType);
+                }
+
+                VkBufferCreateInfo BufferInfo = {};
+                BufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+                BufferInfo.size = ValueSize;
+                BufferInfo.usage = VkBufferUsageFlagBits;
+                BufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+                BufferInfo.flags = 0;
+
+                VmaAllocationCreateInfo AllocCreateInfo = {};
+                AllocCreateInfo.usage = VmaUsageBits;
+                AllocCreateInfo.flags = VmaCreateFlagsBits;
+
+                VkBufferCache& BufferCache = BufferCaches[Index];
+                BufferCache.BufferSize = ValueSize;
+                if (vmaCreateBuffer(MemoryAllocator,
+                    &BufferInfo,
+                    &AllocCreateInfo,
+                    &BufferCache.Buffer,
+                    &BufferCache.Allocation,
+                    &BufferCache.AllocationInfo) != VK_SUCCESS)
+                {
+                    spdlog::error("创建顶点缓冲区失败！");
+                    throw std::runtime_error("Failed to create vertex buffer!");
+                }
+            }
+        );
+
+        return BufferCaches;
     }
+
+    // 偏特化版本：当数据源没有成员时使用，尚未实现
+    template<typename T>
+    [[nodiscard]] std::vector<VkBufferCache> CreateBuffer(const T& iDataSource, VkBufferUsageFlagBits)
+    {
+        spdlog::warn("未实现该函数CreateBuffer");
+        return {};
+    }
+
+
 }

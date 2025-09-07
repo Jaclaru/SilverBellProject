@@ -9,6 +9,7 @@
 #include <vma/vk_mem_alloc.h>
 
 #include "Mixins.hh"
+#include "RenderResource.hh"
 
 namespace SilverBell::Renderer
 {
@@ -73,6 +74,8 @@ namespace SilverBell::Renderer
 
         void RecreateSwapChain(int Width, int Height);
 
+    private:
+
         void CleanupSwapChain();
 
         bool IsDeviceSuitable(VkPhysicalDevice Device);
@@ -86,6 +89,12 @@ namespace SilverBell::Renderer
         QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice Device);
 
         void CreateMemoryAllocator();
+
+        void CopyBuffer(std::vector<VkBufferCache> SrcBuffer, std::vector<VkBufferCache> DstBuffer);
+        void CopyBuffer(VkBufferCache SrcBuffer, VkBufferCache DstBuffer)
+        {
+            CopyBuffer(std::vector{ SrcBuffer }, std::vector{ DstBuffer });
+        }
 
         // Vulkan实例扩展
         std::vector<const char*> InstanceExtensions;
@@ -130,10 +139,10 @@ namespace SilverBell::Renderer
         // 信号量
         VkSemaphore ImageAvailableSemaphore;
         VkSemaphore RenderFinishedSemaphore;
+        // 顶点临时缓冲
+        std::vector<VkBufferCache> StagingBufferCaches;
         // 顶点缓冲
-        std::vector<VkBuffer> VertexBuffers;
-        std::vector<VmaAllocation> VertexBufferAllocations;
-        std::vector<VmaAllocationInfo> VertexBufferAllocationInfos;
+        std::vector<VkBufferCache> VertexBufferCaches;
 
         // VMA内存分配
         VmaAllocator MemoryAllocator;

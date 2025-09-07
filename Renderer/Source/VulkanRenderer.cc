@@ -21,7 +21,6 @@
 #include <vector>
 
 #include "ShaderManager.hh"
-#include "RenderResource.hh"
 
 #include <spdlog/spdlog.h>
 
@@ -180,9 +179,9 @@ void FVulkanRenderer::CleanUp()
     vkDestroyCommandPool(LogicalDevice, CommandPool, nullptr);
 
     // 销毁顶点缓冲区
-    for (int Idx = 0; Idx < VertexBuffers.size(); ++Idx)
+    for (int Idx = 0; Idx < VertexBufferCaches.size(); ++Idx)
     {
-        vmaDestroyBuffer(MemoryAllocator, VertexBuffers[Idx], VertexBufferAllocations[Idx]);
+        vmaDestroyBuffer(MemoryAllocator, VertexBufferCaches[Idx].Buffer, VertexBufferCaches[Idx].Allocation);
     }
     vmaDestroyAllocator(MemoryAllocator);
 
@@ -829,39 +828,33 @@ void FVulkanRenderer::CreateCommandPool()
 
 void FVulkanRenderer::CreateVertexBuffers()
 {
-    auto BufferInfos = GetCreateBufferInfos(Assets::TestTriangleMesh, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-
-    VertexBuffers.resize(BufferInfos.size());
-    VertexBufferAllocations.resize(BufferInfos.size());
-    VertexBufferAllocationInfos.resize(BufferInfos.size());
-    for (size_t Idx = 0; Idx < BufferInfos.size(); ++Idx)
-    {
-        VmaAllocationCreateInfo AllocCreateInfo = {};
-        AllocCreateInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-        AllocCreateInfo.flags = 0;/*VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |*/ /*VMA_ALLOCATION_CREATE_MAPPED_BIT*/;
-
-        if (vmaCreateBuffer(MemoryAllocator, 
-                            &BufferInfos[Idx],
-                            &AllocCreateInfo,
-                            &VertexBuffers[Idx],
-                            &VertexBufferAllocations[Idx],
-                            &VertexBufferAllocationInfos[Idx]) != VK_SUCCESS)
-        {
-            spdlog::error("创建顶点缓冲区失败！");
-            throw std::runtime_error("Failed to create vertex buffer!");
-        }
-    }
+    // 创建临时缓冲区
+    StagingBufferCaches = CreateBuffer(Assets::TestTriangleMesh, MemoryAllocator, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VMA_MEMORY_USAGE_CPU_ONLY, 0);
 
     // 写入顶点数据
     void* Data = nullptr;
-    vmaMapMemory(MemoryAllocator, VertexBufferAllocations[0], &Data);
-    std::memcpy(Data, (void*)Assets::TestTriangleMesh.Positions.data(), BufferInfos[0].size);
-    vmaUnmapMemory(MemoryAllocator, VertexBufferAllocations[0]);
-
+    std::size_t DataSize = StagingBufferCaches[0].BufferSize;
+    vmaMapMemory(MemoryAllocator, StagingBufferCaches[0].Allocation, &Data);
+    std::memcpy(Data, (void*)Assets::TestTriangleMesh.Positions.data(), DataSize);
+    vmaUnmapMemory(MemoryAllocator, StagingBufferCaches[0].Allocation);
     Data = nullptr;
-    vmaMapMemory(MemoryAllocator, VertexBufferAllocations[1], &Data);
-    std::memcpy(Data, (void*)Assets::TestTriangleMesh.Color.data(), BufferInfos[1].size);
-    vmaUnmapMemory(MemoryAllocator, VertexBufferAllocations[1]);
+    DataSize = StagingBufferCaches[1].BufferSize;
+    vmaMapMemory(MemoryAllocator, StagingBufferCaches[1].Allocation, &Data);
+    std::memcpy(Data, (void*)Assets::TestTriangleMesh.Color.data(), DataSize);
+    vmaUnmapMemory(MemoryAllocator, StagingBufferCaches[1].Allocation);
+
+    // 创建顶点缓冲区
+    VertexBufferCaches = CreateBuffer(Assets::TestTriangleMesh, MemoryAllocator,
+        static_cast<VkBufferUsageFlagBits>(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT),
+        VMA_MEMORY_USAGE_GPU_ONLY, 0);
+
+    CopyBuffer(StagingBufferCaches, VertexBufferCaches);
+    // 销毁临时缓冲区
+    for (const auto& BufferCache : StagingBufferCaches)
+    {
+        vmaDestroyBuffer(MemoryAllocator, BufferCache.Buffer, BufferCache.Allocation);
+    }
 }
 
 void FVulkanRenderer::CreateCommandBuffers()
@@ -901,6 +894,8 @@ void FVulkanRenderer::CreateCommandBuffers()
         vkCmdBindPipeline(CommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, GraphicsPipeline);
 
         // 绑定顶点缓冲区
+        std::vector<VkBuffer> VertexBuffers(VertexBufferCaches.size());
+        for (int I = 0; I < VertexBuffers.size(); ++I)VertexBuffers[I] = VertexBufferCaches[I].Buffer;
         VkDeviceSize OffSets[] = {0, 0};
         vkCmdBindVertexBuffers(CommandBuffers[i], 0, static_cast<uint32_t>(VertexBuffers.size()), VertexBuffers.data(), OffSets);
 
@@ -1088,7 +1083,6 @@ void FVulkanRenderer::CreateMemoryAllocator()
     VulkanFunctions.vkGetMemoryWin32HandleKHR = vkGetMemoryWin32HandleKHR;
 #endif
 
-
     VmaAllocatorCreateInfo AllocatorCreateInfo = {};
     AllocatorCreateInfo.vulkanApiVersion = USE_VULKAN_VERSION;
     AllocatorCreateInfo.physicalDevice = PhysicalDevice;
@@ -1101,4 +1095,47 @@ void FVulkanRenderer::CreateMemoryAllocator()
     {
         spdlog::error("创建VMA分配器失败！");
     }
+}
+
+void FVulkanRenderer::CopyBuffer(std::vector<VkBufferCache> SrcBuffer, std::vector<VkBufferCache> DstBuffer)
+{
+    assert(SrcBuffer.size() == DstBuffer.size());
+
+    // 创建一个临时命令缓冲区来执行复制操作
+    VkCommandBufferAllocateInfo AllocInfo = {};
+    AllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    AllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    AllocInfo.commandPool = CommandPool;
+    AllocInfo.commandBufferCount = 1;
+    VkCommandBuffer CommandBuffer;
+    vkAllocateCommandBuffers(LogicalDevice, &AllocInfo, &CommandBuffer);
+
+    VkCommandBufferBeginInfo BeginInfo = {};
+    BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    // 告知Vulkan驱动程序使用VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT是一个好的习惯
+    BeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    vkBeginCommandBuffer(CommandBuffer, &BeginInfo);
+
+    for (int Idx = 0; Idx < SrcBuffer.size(); ++Idx)
+    {
+        VkBufferCache& SrcBufferCache = SrcBuffer[Idx];
+        VkBufferCache& DstBufferCache = DstBuffer[Idx];
+        VkBufferCopy CopyRegion = {};
+        CopyRegion.srcOffset = 0;
+        CopyRegion.dstOffset = 0;
+        CopyRegion.size = SrcBufferCache.BufferSize;
+        vkCmdCopyBuffer(CommandBuffer, SrcBufferCache.Buffer, DstBufferCache.Buffer, 1, &CopyRegion);
+    }
+    vkEndCommandBuffer(CommandBuffer);
+
+    // 提交并等待复制完成
+    VkSubmitInfo submitInfo = {};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &CommandBuffer;
+    vkQueueSubmit(GraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueWaitIdle(GraphicsQueue);
+
+    // 清理临时资源
+    vkFreeCommandBuffers(LogicalDevice, CommandPool, 1, &CommandBuffer);
 }

@@ -1,21 +1,16 @@
 #include "RendererWindow.hh"
 
-#include <iostream>
-
+#include "Application.hh"
+#include "GlobalContext.hh"
 #include "VulkanRenderer.hh"
 
 #include <QDateTime>
-#include <QDebug>
-#include <QString>
 #include <QVulkanInstance>
 #include <QTimer>
 
 #include <spdlog/spdlog.h>
 
 #include <unordered_set>
-
-#include "Application.hh"
-#include "GlobalContext.hh"
 
 using namespace SilverBell::Renderer;
 using namespace SilverBell::Application;
