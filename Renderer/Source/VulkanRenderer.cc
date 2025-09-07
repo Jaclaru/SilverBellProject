@@ -183,6 +183,12 @@ void FVulkanRenderer::CleanUp()
     {
         vmaDestroyBuffer(MemoryAllocator, VertexBufferCaches[Idx].Buffer, VertexBufferCaches[Idx].Allocation);
     }
+    // 销毁索引缓冲区
+    for (int Idx = 0; Idx < IndexBufferCaches.size(); ++Idx)
+    {
+        vmaDestroyBuffer(MemoryAllocator, IndexBufferCaches[Idx].Buffer, IndexBufferCaches[Idx].Allocation);
+    }
+
     vmaDestroyAllocator(MemoryAllocator);
 
     vkDestroyDevice(LogicalDevice, nullptr);
@@ -857,6 +863,29 @@ void FVulkanRenderer::CreateVertexBuffers()
     }
 }
 
+void FVulkanRenderer::CreateIndexBuffer()
+{
+    // 创建临时缓冲区
+    StagingBufferCaches = CreateBuffer(Assets::TestTriangleMeshIndices, MemoryAllocator, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VMA_MEMORY_USAGE_CPU_ONLY, 0);
+    // 写入顶点索引数据
+    void* Data = nullptr;
+    std::size_t DataSize = StagingBufferCaches[0].BufferSize;
+    vmaMapMemory(MemoryAllocator, StagingBufferCaches[0].Allocation, &Data);
+    std::memcpy(Data, (void*)Assets::TestTriangleMeshIndices.Indices.data(), DataSize);
+    vmaUnmapMemory(MemoryAllocator, StagingBufferCaches[0].Allocation);
+
+    IndexBufferCaches = CreateBuffer(Assets::TestTriangleMeshIndices, MemoryAllocator, 
+        static_cast<VkBufferUsageFlagBits>(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT),
+        VMA_MEMORY_USAGE_GPU_ONLY, 0);
+    CopyBuffer(StagingBufferCaches, IndexBufferCaches);
+    // 销毁临时缓冲区
+    for (const auto& BufferCache : StagingBufferCaches)
+    {
+        vmaDestroyBuffer(MemoryAllocator, BufferCache.Buffer, BufferCache.Allocation);
+    }
+}
+
 void FVulkanRenderer::CreateCommandBuffers()
 {
     CommandBuffers.resize(SwapChainFramebuffers.size());
@@ -898,9 +927,10 @@ void FVulkanRenderer::CreateCommandBuffers()
         for (int I = 0; I < VertexBuffers.size(); ++I)VertexBuffers[I] = VertexBufferCaches[I].Buffer;
         VkDeviceSize OffSets[] = {0, 0};
         vkCmdBindVertexBuffers(CommandBuffers[i], 0, static_cast<uint32_t>(VertexBuffers.size()), VertexBuffers.data(), OffSets);
+        vkCmdBindIndexBuffer(CommandBuffers[i], IndexBufferCaches[0].Buffer, 0, VK_INDEX_TYPE_UINT16);
 
         vkCmdBeginRenderPass(CommandBuffers[i], &RenderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-        vkCmdDraw(CommandBuffers[i], 3, 1, 0, 0); // 绘制一个三角形
+        vkCmdDrawIndexed(CommandBuffers[i], Assets::TestTriangleMeshIndices.Indices.size(), 1, 0, 0, 0); // 绘制一个三角形
         vkCmdEndRenderPass(CommandBuffers[i]);
         if (vkEndCommandBuffer(CommandBuffers[i]) != VK_SUCCESS)
         {

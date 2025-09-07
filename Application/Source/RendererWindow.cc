@@ -179,6 +179,7 @@ void FRendererWindow::InitializeVulkanRenderer()
     tRenderer->CreateFramebuffers();
     tRenderer->CreateCommandPool();
     tRenderer->CreateVertexBuffers();
+    tRenderer->CreateIndexBuffer();
     tRenderer->CreateCommandBuffers();
     tRenderer->CreateSemaphores();
 

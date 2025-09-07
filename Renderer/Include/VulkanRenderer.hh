@@ -68,6 +68,8 @@ namespace SilverBell::Renderer
 
         void CreateVertexBuffers();
 
+        void CreateIndexBuffer();
+
         void CreateCommandBuffers();
 
         void CreateSemaphores();
@@ -143,6 +145,8 @@ namespace SilverBell::Renderer
         std::vector<VkBufferCache> StagingBufferCaches;
         // 顶点缓冲
         std::vector<VkBufferCache> VertexBufferCaches;
+        // 顶点索引缓冲
+        std::vector<VkBufferCache> IndexBufferCaches;
 
         // VMA内存分配
         VmaAllocator MemoryAllocator;
