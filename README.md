@@ -1,6 +1,6 @@
 # SilverBell Project.
 
-![doro的英雄主义](Assets\Images\README\cfbf9f8d34eb8db3378dfd6cf1669dee16264389.jpg#pic_center "doro的英雄主义")
+![doro的英雄主义](Assets/Images/README/cfbf9f8d34eb8db3378dfd6cf1669dee16264389.jpg#pic_center "doro的英雄主义")
 
 <div div align="center">
     <strong><em>我的长枪被大雨磨钝了，我的战耄也不哈气了，但我的冲锋是堂吉诃德式的冲锋！   </em></strong>
