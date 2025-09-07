@@ -27,6 +27,10 @@ namespace SilverBell::Application
 
         void Stop() { bRunning = false; }
 
+        bool IsRunning() const { return bRunning; }
+
+        void RequestResize(int w, int h) { bNeedResize = true; NewWidth = w; NewHeight = h; }
+
     signals:
 
         void UpdateFPS(double iFPS);
@@ -34,6 +38,8 @@ namespace SilverBell::Application
     private:
         Renderer::FVulkanRenderer* Renderer;
         std::atomic<bool> bRunning;
+        std::atomic<bool> bNeedResize;
+        int NewWidth, NewHeight;
     };
 
     class FRendererWindow : public QWindow
@@ -46,19 +52,26 @@ namespace SilverBell::Application
 
         void exposeEvent(QExposeEvent*) override;
 
-        void Render();
+        void resizeEvent(QResizeEvent*) override;
 
-        //bool event(QEvent* Event) override;
+        void HandleResize();
 
     private:
 
         void InitializeVulkanRenderer();
+
 
         std::unique_ptr<Renderer::FVulkanRenderer> Renderer;
 
         bool bInitialzed;
 
         std::unique_ptr<FRendererThread> RenderThread;
+
+        QSize lastSize;
+
+        QTimer* ResizeTimer;
+
+        bool bFirstResize;
     };
 
     //class FRenderWidget : public QWidget

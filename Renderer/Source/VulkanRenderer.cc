@@ -943,12 +943,12 @@ void FVulkanRenderer::RecreateSwapChain(int Width, int Height)
 
 void FVulkanRenderer::CleanupSwapChain()
 {
+
+    vkFreeCommandBuffers(LogicalDevice, CommandPool, static_cast<uint32_t>(CommandBuffers.size()), CommandBuffers.data());
     for (auto Framebuffer : SwapChainFramebuffers)
     {
         vkDestroyFramebuffer(LogicalDevice, Framebuffer, nullptr);
     }
-
-    vkFreeCommandBuffers(LogicalDevice, CommandPool, static_cast<uint32_t>(CommandBuffers.size()), CommandBuffers.data());
 
     vkDestroyPipeline(LogicalDevice, GraphicsPipeline, nullptr);
     vkDestroyPipelineLayout(LogicalDevice, PipelineLayout, nullptr);

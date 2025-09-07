@@ -1,11 +1,14 @@
 #include "RendererWindow.hh"
 
+#include <iostream>
+
 #include "VulkanRenderer.hh"
 
 #include <QDateTime>
 #include <QDebug>
 #include <QString>
 #include <QVulkanInstance>
+#include <QTimer>
 
 #include <spdlog/spdlog.h>
 
@@ -32,6 +35,11 @@ void FRendererThread::run()
 {
     while (bRunning)
     {
+        if (bNeedResize) 
+        {
+            Renderer->RecreateSwapChain(NewWidth, NewHeight);
+            bNeedResize = false;
+        }
         if (Renderer->DrawFrame())
         {
             // 帧率统计
@@ -57,7 +65,9 @@ void FRendererThread::run()
 
 FRendererWindow::FRendererWindow()
     : Renderer(nullptr),
-      bInitialzed(false)
+      bInitialzed(false),
+    ResizeTimer(nullptr),
+    bFirstResize(true)
 {
     setWidth(800);
     setHeight(600);
@@ -71,6 +81,7 @@ FRendererWindow::~FRendererWindow()
     {
         RenderThread->Stop();
         RenderThread->wait();
+        spdlog::info("渲染线程正常退出！");
     }
 }
 
@@ -88,21 +99,57 @@ void FRendererWindow::exposeEvent(QExposeEvent*)
     }
 }
 
-void FRendererWindow::Render()
+//void FRendererWindow::Render()
+//{
+//    if (Renderer == nullptr) return;
+//
+//    // 这里存在一个bug.由于这里做的递归requestUpdate
+//    // 窗口大小变化时，Qt 会频繁发送重绘/刷新事件，如 QEvent::UpdateRequest，
+//    // 形成“自激”渲染循环，导致 Render() 被高频调用。
+//    // 这会引发性能问题，甚至导致应用程序无响应。
+//    // 已改完通过渲染线程持续渲染
+//
+//    // 成功绘制一帧后继续请求下一帧
+//    if (Renderer->DrawFrame())
+//    {
+//        requestUpdate();
+//    }
+//}
+
+void FRendererWindow::resizeEvent(QResizeEvent* Event)
 {
-    if (Renderer == nullptr) return;
-
-    // 这里存在一个bug.由于这里做的递归requestUpdate
-    // 窗口大小变化时，Qt 会频繁发送重绘/刷新事件，如 QEvent::UpdateRequest，
-    // 形成“自激”渲染循环，导致 Render() 被高频调用。
-    // 这会引发性能问题，甚至导致应用程序无响应。
-    // 已改完通过渲染线程持续渲染
-
-    // 成功绘制一帧后继续请求下一帧
-    if (Renderer->DrawFrame())
+    // 第一次resize时，直接记录大小，后续变化再处理
+    if (bFirstResize) 
     {
-        requestUpdate();
+        bFirstResize = false;
+        lastSize = size();
+        return;
     }
+
+    // 大小没有变化则不处理
+    if (size() == lastSize) return;
+    lastSize = size();
+
+    // 使用定时器延迟处理，避免频繁触发
+    if (!ResizeTimer) {
+        ResizeTimer = new QTimer(this);
+        ResizeTimer->setSingleShot(true);
+        connect(ResizeTimer, &QTimer::timeout, this, &FRendererWindow::HandleResize);
+    }
+    ResizeTimer->start(200); // 200ms后触发
+
+    // 调用基类的resizeEvent以确保事件被正确处理
+    QWindow::resizeEvent(Event);
+}
+
+void FRendererWindow::HandleResize()
+{
+    // 通知渲染线程调整大小
+    if (RenderThread && RenderThread->IsRunning()) 
+    {
+        RenderThread->RequestResize(this->width(), this->height());
+    }
+    spdlog::info("窗口大小变化为：{} , {}", this->width(), this->height());
 }
 
 void FRendererWindow::InitializeVulkanRenderer()
