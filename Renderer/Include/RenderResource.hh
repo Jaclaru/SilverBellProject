@@ -161,8 +161,8 @@ namespace SilverBell::Renderer
                     &BufferCache.Allocation,
                     &BufferCache.AllocationInfo) != VK_SUCCESS)
                 {
-                    spdlog::error("创建顶点缓冲区失败！");
-                    throw std::runtime_error("Failed to create vertex buffer!");
+                    spdlog::error("创建缓冲区失败！");
+                    throw std::runtime_error("Failed to create buffer!");
                 }
             }
         );
