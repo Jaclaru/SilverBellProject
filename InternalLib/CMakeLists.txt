@@ -11,3 +11,8 @@ target_include_directories(InternalLib PUBLIC ${EIGEN_INCLUDE_DIR})
 
 # yalantinglibs
 target_link_libraries(InternalLib PUBLIC yalantinglibs::yalantinglibs)
+
+# 链接 spdlog
+target_include_directories(InternalLib PRIVATE ${SPDLOG_INCLUDE_DIR})
+target_link_directories(InternalLib PRIVATE ${SPDLOG_LIBRARY_DIR})
+target_link_libraries(InternalLib PRIVATE  debug spdlogd optimized spdlog)
