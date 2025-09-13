@@ -7,3 +7,12 @@ GlobalContext& GlobalContext::Instance()
     static GlobalContext Instance;
     return Instance;
 }
+
+GlobalContext::GlobalContext()
+{
+    MainWindow = nullptr;
+}
+
+GlobalContext::~GlobalContext()
+{
+}

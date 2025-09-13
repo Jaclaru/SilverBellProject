@@ -48,4 +48,20 @@ namespace SilverBell::Assets
         .Indices = { 0, 1, 2, 2, 3, 0 }
     };
 
+    struct MVPMatrix
+    {
+        Math::Mat4  Model;
+        Math::Mat4  View;
+        Math::Mat4  Projection;
+    };
+    YLT_REFL(MVPMatrix, Model, View, Projection);
+
+    //constexpr inline auto MemberCount = ylt::reflection::members_count_v<MVPMatrix>;
+    inline MVPMatrix TestTriangleMeshUniformBufferObject =
+    {
+        .Model = Math::Mat4::Identity(),
+        .View = Math::Mat4::Identity(),
+        .Projection = Math::Mat4::Identity()
+    };
+
 }

@@ -82,12 +82,10 @@ namespace SilverBell::TMP
                         auto Args = ExtractArgs<Traits>();
                         std::apply(F, Args);
                     }
-                    catch (const std::exception& e)
+                    catch (const std::exception& E)
                     {
-                        // 处理类型转换错误
-                        // 可以选择记录日志或抛出异常
-                        spdlog::warn("回调需要的参数超出！注册失败！");
-                        throw std::runtime_error("参数类型不匹配: " + std::string(e.what()));
+                        spdlog::warn("回调函数异常：{}", E.what());
+                        throw std::runtime_error("参数类型不匹配: " + std::string(E.what()));
                     }
                 }
             };
@@ -109,9 +107,9 @@ namespace SilverBell::TMP
                 {
                     Callback();
                 }
-                catch (const std::exception& e) 
+                catch (const std::exception& E) 
                 {
-                    spdlog::error("回调函数出错：{}", e.what());
+                    spdlog::error("回调函数出错：{}", E.what());
                 }
             }
         }
@@ -185,46 +183,28 @@ namespace SilverBell::TMP
 
         // 提取参数并转换为函数需要的类型
         template<typename Traits>
-        typename Traits::ArgsTuple ExtractArgs()
+        Traits::ArgsTuple ExtractArgs()
         {
             return [this]<size_t... I>(std::index_sequence<I...>)
             {
-                return typename Traits::ArgsTuple{ExtractArg<typename Traits::template ArgType<I>>(I)...};
+                return typename Traits::ArgsTuple{ExtractArg<typename Traits::template ArgType<I>>()...};
             }(std::make_index_sequence<Traits::Arity>{});
         }
 
-        // 提取单个参数并转换为指定类型
         template<typename T>
-        T ExtractArg(size_t Index)
+        requires IsInVariantValue<std::remove_cvref_t<T>, VariantType>
+        T ExtractArg()
         {
-            if (Index >= Params.size())
+            using TNoRef = std::remove_cvref_t<T>;
+            for (auto& Param : Params)
             {
-                spdlog::error("提取的索引超出范围！");
-                throw std::runtime_error("Parameter not found at index " + std::to_string(Index));
-            }
-            try 
-            {
-
-                return std::visit([](auto&& Arg) -> T 
+                if (std::holds_alternative<TNoRef>(Param))
                 {
-                    using U = std::decay_t<decltype(Arg)>;
-                    if constexpr (std::is_convertible_v<U, T>) 
-                    {
-                        return static_cast<T>(Arg);
-                    }
-                    else 
-                    {
-                        throw std::bad_variant_access();
-                    }
-                }, Params[Index]);
-
+                    return std::get<TNoRef>(Param);
+                }
             }
-            catch (const std::bad_variant_access&)
-            {
-                spdlog::error("参数类型不匹配，提取失败！");
-                throw std::runtime_error("Parameter type mismatch at index " + std::to_string(Index));
-            }
-
+            spdlog::error("参数类型不匹配，提取失败！");
+            throw std::runtime_error("Parameter type mismatch!");
         }
 
         std::vector<VariantType> Params;

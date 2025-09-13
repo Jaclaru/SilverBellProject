@@ -172,10 +172,39 @@ namespace SilverBell::Renderer
 
     // 偏特化版本：当数据源没有成员时使用，尚未实现
     template<typename T>
-    [[nodiscard]] std::vector<VkBufferCache> CreateBuffer(const T& iDataSource, VkBufferUsageFlagBits)
+    [[nodiscard]] std::vector<VkBufferCache> CreateBufferPack(const T& iDataSource,
+        VmaAllocator MemoryAllocator,
+        VkBufferUsageFlagBits VkBufferUsageFlagBits,
+        VmaMemoryUsage VmaUsageBits,
+        VmaAllocationCreateFlags VmaCreateFlagsBits)
     {
-        spdlog::warn("未实现该函数CreateBuffer");
-        return {};
+        std::vector<VkBufferCache> BufferCaches(1);
+        size_t ValueSize = sizeof(T);
+
+        VkBufferCreateInfo BufferInfo = {};
+        BufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        BufferInfo.size = ValueSize;
+        BufferInfo.usage = VkBufferUsageFlagBits;
+        BufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        BufferInfo.flags = 0;
+
+        VmaAllocationCreateInfo AllocCreateInfo = {};
+        AllocCreateInfo.usage = VmaUsageBits;
+        AllocCreateInfo.flags = VmaCreateFlagsBits;
+
+        VkBufferCache& BufferCache = BufferCaches[0];
+        BufferCache.BufferSize = ValueSize;
+        if (vmaCreateBuffer(MemoryAllocator,
+            &BufferInfo,
+            &AllocCreateInfo,
+            &BufferCache.Buffer,
+            &BufferCache.Allocation,
+            &BufferCache.AllocationInfo) != VK_SUCCESS)
+        {
+            spdlog::error("创建缓冲区失败！");
+            throw std::runtime_error("Failed to create buffer!");
+        }
+        return BufferCaches;
     }
 
 

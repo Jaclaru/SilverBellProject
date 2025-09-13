@@ -3,6 +3,8 @@
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 
+#include "InternalLibMarco.hh"
+
 #include <cstdint>
 
 namespace SilverBell::Math
@@ -130,13 +132,13 @@ namespace SilverBell::Math
 
     Vec3 ClampEulerAngle(Vec3 Angle);
 
-    Vec3 ToEulerAngle(const Quaternion& q);  
+    INTERNALLIB_API Vec3 ToEulerAngle(const Quaternion& q);
 
-    Quaternion ToQuaternion(Vec3 eulerAngle);
+    INTERNALLIB_API Quaternion ToQuaternion(Vec3 eulerAngle);
 
-    Mat4 LookAt(Vec3 eye, Vec3 center, Vec3 up);
+    INTERNALLIB_API Mat4 LookAt(Vec3 eye, Vec3 center, Vec3 up);
 
-    Mat4 Perspective(float fovy, float aspect, float near, float far);
+    INTERNALLIB_API Mat4 Perspective(float fovy, float aspect, float near, float far);
 
     Mat4 Ortho(float left, float right, float bottom, float top, float near, float far);
 

@@ -11,22 +11,21 @@ struct VSOutput
     float3 Color : COLOR0;
 };
 
-static const float2 Position[3] = {
-    float2(0.0f, -0.5f),
-    float2(0.5f, 0.5f),
-    float2(-0.5f, 0.5f)
-};
-
-static const float3 Color[3] = {
-    float3(1.0f, 0.0f, 0.0f),
-    float3(0.0f, 1.0f, 0.0f),
-    float3(0.0f, 0.0f, 1.0f)
-};
+// MVP变换矩阵
+cbuffer MVPBuffer : register(b0, space0)
+{
+    float4x4 Model;
+    float4x4 View;
+    float4x4 Projection;
+}
 
 VSOutput Main(VSInput Input)
 {
     VSOutput output;
-    output.Pos = float4(Input.Pos, 1.0f);
+    float4 WorldPos = mul(Model, float4(Input.Pos, 1.0));
+    float4 ViewPos = mul(View, WorldPos);
+    float4 HomogeneousPos = mul(Projection, ViewPos); // 齐次坐标
+    output.Pos = HomogeneousPos;
     output.Color = Input.Color;
     return output;
 }

@@ -26,8 +26,26 @@ namespace
     };
 }
 
+FRendererThread::FRendererThread(FVulkanRenderer* renderer, QObject* parent)
+    : QThread(parent), Renderer(renderer), bRunning(true)
+{
+    BeforeRenderEvent::Instance().SetParameter(0, &TimeInformation);
+
+    BeforeRenderEvent::Instance().Connect([](TimeInfo* Info)
+    {
+        if (Info->LastTickTime == 0.0)
+        {
+            Info->LastTickTime = QDateTime::currentMSecsSinceEpoch() / 1000.0;
+        }
+        Info->CurrentTime = QDateTime::currentMSecsSinceEpoch() / 1000.0;
+        Info->DeltaTime = Info->CurrentTime - Info->LastTickTime;
+        Info->WorldTime = Info->CurrentTime - Info->RenderStartTime;
+    });
+}
+
 void FRendererThread::run()
 {
+    TimeInformation.RenderStartTime = QDateTime::currentMSecsSinceEpoch() / 1000.0;
     while (bRunning)
     {
         if (bNeedResize) 
@@ -35,6 +53,7 @@ void FRendererThread::run()
             Renderer->RecreateSwapChain(NewWidth, NewHeight);
             bNeedResize = false;
         }
+        BeforeRenderEvent::Instance().Trigger();
         if (Renderer->DrawFrame())
         {
             // 帧率统计
@@ -175,11 +194,15 @@ void FRendererWindow::InitializeVulkanRenderer()
     tRenderer->CreateSwapChain(this->width(), this->height());
     tRenderer->CreateImageViews();
     tRenderer->CreateRenderPass();
+    tRenderer->CreateDescriptorSetLayout();
     tRenderer->CreateGraphicsPipeline();
     tRenderer->CreateFramebuffers();
     tRenderer->CreateCommandPool();
     tRenderer->CreateVertexBuffers();
     tRenderer->CreateIndexBuffer();
+    tRenderer->CreateConstantBuffer();
+    tRenderer->CreateDescriptorPool();
+    tRenderer->CreateDescriptorSet();
     tRenderer->CreateCommandBuffers();
     tRenderer->CreateSemaphores();
 
@@ -193,6 +216,11 @@ void FRendererWindow::InitializeVulkanRenderer()
     {
         connect(RenderThread.get(), &FRendererThread::UpdateFPS, MainWindow, &FApplication::OnUpdateFPS);
     }
+
+    BeforeRenderEvent::Instance().Connect([iRender = Renderer.get()](TimeInfo* Info)
+    {
+        iRender->UpdateBuffer(Info->WorldTime);
+    });
 }
 
 //FRenderWidget::FRenderWidget(QWidget* Parent)

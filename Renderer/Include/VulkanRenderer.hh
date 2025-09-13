@@ -62,6 +62,8 @@ namespace SilverBell::Renderer
 
         void CreateFramebuffers();
 
+        void CreateDescriptorSetLayout();
+
         void CreateGraphicsPipeline();
 
         void CreateCommandPool();
@@ -69,6 +71,14 @@ namespace SilverBell::Renderer
         void CreateVertexBuffers();
 
         void CreateIndexBuffer();
+
+        void CreateConstantBuffer();
+
+        void UpdateBuffer(const double Time);
+
+        void CreateDescriptorPool();
+
+        void CreateDescriptorSet();
 
         void CreateCommandBuffers();
 
@@ -130,10 +140,17 @@ namespace SilverBell::Renderer
         std::vector<VkFramebuffer> SwapChainFramebuffers;
         // Vulkan着色器模块
         std::vector<VkShaderModule> ShaderModules;
-        // Vulkan渲染管线
-        VkPipeline GraphicsPipeline;
+        // 描述符集布局
+        VkDescriptorSetLayout DescriptorSetLayout;
+        // 描述符池
+        VkDescriptorPool DescriptorPool;
+        // 描述符集
+        VkDescriptorSet DescriptorSet;
+
         // Vulkan渲染管线布局
         VkPipelineLayout PipelineLayout;
+        // Vulkan渲染管线
+        VkPipeline GraphicsPipeline;
         // Vulkan命令池
         VkCommandPool CommandPool;
         // Vulkan命令缓冲区
@@ -147,6 +164,8 @@ namespace SilverBell::Renderer
         std::vector<VkBufferCache> VertexBufferCaches;
         // 顶点索引缓冲
         std::vector<VkBufferCache> IndexBufferCaches;
+        // 常量缓冲区
+        std::vector<VkBufferCache> ConstantBufferCaches;
 
         // VMA内存分配
         VmaAllocator MemoryAllocator;

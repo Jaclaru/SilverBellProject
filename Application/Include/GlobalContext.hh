@@ -6,7 +6,6 @@ namespace SilverBell::Application
 {
     class FApplication;
 
-    // 全局上下文，单例模式
     class GlobalContext : public NonCopyable, public NonMovable
     {
     public:
@@ -23,10 +22,11 @@ namespace SilverBell::Application
         }
 
     private:
-        GlobalContext() = default;
-        ~GlobalContext() = default;
+        GlobalContext();
+        ~GlobalContext();
 
         FApplication* MainWindow;
+
     };
 
 }

@@ -174,19 +174,30 @@ void FVulkanRenderer::CleanUp()
     {
         vkDestroyShaderModule(LogicalDevice, ShaderModule, nullptr);
     }
+
+    // 销毁描述符集布局
+    vkDestroyDescriptorSetLayout(LogicalDevice, DescriptorSetLayout, nullptr);
+    // 销毁描述符池
+    vkDestroyDescriptorPool(LogicalDevice, DescriptorPool, nullptr);
+
     vkDestroySemaphore(LogicalDevice, RenderFinishedSemaphore, nullptr);
     vkDestroySemaphore(LogicalDevice, ImageAvailableSemaphore, nullptr);
     vkDestroyCommandPool(LogicalDevice, CommandPool, nullptr);
 
     // 销毁顶点缓冲区
-    for (int Idx = 0; Idx < VertexBufferCaches.size(); ++Idx)
+    for (auto& BufferCache : VertexBufferCaches)
     {
-        vmaDestroyBuffer(MemoryAllocator, VertexBufferCaches[Idx].Buffer, VertexBufferCaches[Idx].Allocation);
+        vmaDestroyBuffer(MemoryAllocator, BufferCache.Buffer, BufferCache.Allocation);
     }
     // 销毁索引缓冲区
-    for (int Idx = 0; Idx < IndexBufferCaches.size(); ++Idx)
+    for (auto& BufferCache : IndexBufferCaches)
     {
-        vmaDestroyBuffer(MemoryAllocator, IndexBufferCaches[Idx].Buffer, IndexBufferCaches[Idx].Allocation);
+        vmaDestroyBuffer(MemoryAllocator, BufferCache.Buffer, BufferCache.Allocation);
+    }
+    // 销毁常量缓冲区
+    for (auto& BufferCache : ConstantBufferCaches)
+    {
+        vmaDestroyBuffer(MemoryAllocator, BufferCache.Buffer, BufferCache.Allocation);
     }
 
     vmaDestroyAllocator(MemoryAllocator);
@@ -726,7 +737,7 @@ void FVulkanRenderer::CreateGraphicsPipeline()
     Rasterizer.polygonMode = VK_POLYGON_MODE_FILL; // 填充模式
     Rasterizer.lineWidth = 1.0f; // 线宽
     Rasterizer.cullMode = VK_CULL_MODE_BACK_BIT; // 背面剔除
-    Rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE; // 顺时针为前面
+    Rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE; // 顺时针为前面
     Rasterizer.depthBiasEnable = VK_FALSE; // 不启用深度偏移
     Rasterizer.depthBiasConstantFactor = 0.0f; // 深度偏移常数因子
     Rasterizer.depthBiasClamp = 0.0f; // 深度偏移夹紧
@@ -777,8 +788,8 @@ void FVulkanRenderer::CreateGraphicsPipeline()
     // 创建管线布局
     VkPipelineLayoutCreateInfo PipelineLayoutInfo = {};
     PipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    PipelineLayoutInfo.setLayoutCount = 0; // 如果没有描述符集布局
-    PipelineLayoutInfo.pSetLayouts = nullptr; // 没有描述符集布局
+    PipelineLayoutInfo.setLayoutCount = 1;
+    PipelineLayoutInfo.pSetLayouts = &DescriptorSetLayout;
     PipelineLayoutInfo.pushConstantRangeCount = 0; // 如果没有推送常量范围
     PipelineLayoutInfo.pPushConstantRanges = nullptr; // 没有推送常量范围
     if (vkCreatePipelineLayout(LogicalDevice, &PipelineLayoutInfo, nullptr, &PipelineLayout) != VK_SUCCESS)
@@ -886,6 +897,78 @@ void FVulkanRenderer::CreateIndexBuffer()
     }
 }
 
+
+void FVulkanRenderer::CreateConstantBuffer()
+{
+    ConstantBufferCaches = CreateBufferPack(Assets::TestTriangleMeshUniformBufferObject, MemoryAllocator,
+        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_ONLY, 0);
+}
+
+void FVulkanRenderer::UpdateBuffer(const double Time)
+{
+    Math::Vec3 EulerAngle(0.0f, 0.0f, static_cast<float>(Time) * 90.0f);
+    Assets::TestTriangleMeshUniformBufferObject.Model.block<3, 3>(0, 0)
+        = Math::ToQuaternion(EulerAngle).normalized().toRotationMatrix();
+    Assets::TestTriangleMeshUniformBufferObject.View = Math::LookAt(Math::Vec3(2.0f, 2.0f, 2.0f), 
+                                                                  Math::Vec3(0.0f, 0.0f, 0.0f), 
+                                                                     Math::Vec3(0.0f, 0.0f, 1.0f));
+    Assets::TestTriangleMeshUniformBufferObject.Projection
+        = Math::Perspective(Math::ToRadians(45.f), SwapChainExtent.width / (float)SwapChainExtent.height, 0.1f, 10.0f);
+
+    Assets::TestTriangleMeshUniformBufferObject.Projection(1, 1) *= -1; //Vulkan 的NDC是向下
+
+    void* Data = nullptr;
+    vmaMapMemory(MemoryAllocator, ConstantBufferCaches[0].Allocation, &Data);
+    std::memcpy(Data, &Assets::TestTriangleMeshUniformBufferObject, sizeof(Assets::TestTriangleMeshUniformBufferObject));
+    vmaUnmapMemory(MemoryAllocator, ConstantBufferCaches[0].Allocation);
+}
+
+void FVulkanRenderer::CreateDescriptorPool()
+{
+    VkDescriptorPoolSize PoolSize = {};
+    PoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    PoolSize.descriptorCount = 1; // 假设只需要一个描述符
+    VkDescriptorPoolCreateInfo PoolCreateInfo = {};
+    PoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    PoolCreateInfo.poolSizeCount = 1;
+    PoolCreateInfo.pPoolSizes = &PoolSize;
+    PoolCreateInfo.maxSets = 1; // 假设只需要一个描述符
+    if (vkCreateDescriptorPool(LogicalDevice, &PoolCreateInfo, nullptr, &DescriptorPool) != VK_SUCCESS)
+    {
+        spdlog::error("创建描述符池失败！");
+        throw std::runtime_error("Failed to create descriptor pool!");
+    }
+}
+
+void FVulkanRenderer::CreateDescriptorSet()
+{
+    VkDescriptorSetAllocateInfo AllocateInfo = {};
+    AllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    AllocateInfo.descriptorPool = DescriptorPool;
+    AllocateInfo.descriptorSetCount = 1; // 假设只需要一个描述符
+    AllocateInfo.pSetLayouts = &DescriptorSetLayout;
+    if (vkAllocateDescriptorSets(LogicalDevice, &AllocateInfo, &DescriptorSet) != VK_SUCCESS)
+    {
+        spdlog::error("分配描述符集失败！");
+        throw std::runtime_error("Failed to allocate descriptor set!");
+    }
+    VkDescriptorBufferInfo BufferInfo = {};
+    BufferInfo.buffer = ConstantBufferCaches[0].Buffer;
+    BufferInfo.offset = 0;
+    BufferInfo.range = sizeof(Assets::TestTriangleMeshUniformBufferObject);
+    VkWriteDescriptorSet DescriptorWrite = {};
+    DescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    DescriptorWrite.dstSet = DescriptorSet;
+    DescriptorWrite.dstBinding = 0; // 假设绑定点为0
+    DescriptorWrite.dstArrayElement = 0;
+    DescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    DescriptorWrite.descriptorCount = 1; // 假设只写入一个描述符
+    DescriptorWrite.pBufferInfo = &BufferInfo;
+    DescriptorWrite.pImageInfo = nullptr; // 如果不使用图像描述符
+    DescriptorWrite.pTexelBufferView = nullptr; // 如果不使用纹理缓冲视图
+    vkUpdateDescriptorSets(LogicalDevice, 1, &DescriptorWrite, 0, nullptr);
+}
+
 void FVulkanRenderer::CreateCommandBuffers()
 {
     CommandBuffers.resize(SwapChainFramebuffers.size());
@@ -899,13 +982,13 @@ void FVulkanRenderer::CreateCommandBuffers()
         spdlog::error("分配命令缓冲失败！");
         throw std::runtime_error("Failed to allocate command buffers!");
     }
-    for (size_t i = 0; i < CommandBuffers.size(); ++i)
+    for (size_t I = 0; I < CommandBuffers.size(); ++I)
     {
         VkCommandBufferBeginInfo BeginInfo = {};
         BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         BeginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT; // 可选标志
         BeginInfo.pInheritanceInfo = nullptr; // 可选继承信息
-        if (vkBeginCommandBuffer(CommandBuffers[i], &BeginInfo) != VK_SUCCESS)
+        if (vkBeginCommandBuffer(CommandBuffers[I], &BeginInfo) != VK_SUCCESS)
         {
             spdlog::error("开始录制命令缓冲失败！");
             throw std::runtime_error("Failed to begin recording command buffer!");
@@ -914,25 +997,25 @@ void FVulkanRenderer::CreateCommandBuffers()
         VkRenderPassBeginInfo RenderPassInfo = {};
         RenderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
         RenderPassInfo.renderPass = RenderPass;
-        RenderPassInfo.framebuffer = SwapChainFramebuffers[i];
+        RenderPassInfo.framebuffer = SwapChainFramebuffers[I];
         RenderPassInfo.renderArea.offset = {.x = 0, .y = 0 };
         RenderPassInfo.renderArea.extent = SwapChainExtent;
         VkClearValue ClearColor = { {{0.0f, 0.0f, 0.0f, 1.0f}} }; // 清除颜色为黑色
         RenderPassInfo.clearValueCount = 1;
         RenderPassInfo.pClearValues = &ClearColor;
-        vkCmdBindPipeline(CommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, GraphicsPipeline);
+        vkCmdBindPipeline(CommandBuffers[I], VK_PIPELINE_BIND_POINT_GRAPHICS, GraphicsPipeline);
 
         // 绑定顶点缓冲区
         std::vector<VkBuffer> VertexBuffers(VertexBufferCaches.size());
         for (int I = 0; I < VertexBuffers.size(); ++I)VertexBuffers[I] = VertexBufferCaches[I].Buffer;
         VkDeviceSize OffSets[] = {0, 0};
-        vkCmdBindVertexBuffers(CommandBuffers[i], 0, static_cast<uint32_t>(VertexBuffers.size()), VertexBuffers.data(), OffSets);
-        vkCmdBindIndexBuffer(CommandBuffers[i], IndexBufferCaches[0].Buffer, 0, VK_INDEX_TYPE_UINT16);
-
-        vkCmdBeginRenderPass(CommandBuffers[i], &RenderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-        vkCmdDrawIndexed(CommandBuffers[i], Assets::TestTriangleMeshIndices.Indices.size(), 1, 0, 0, 0); // 绘制一个三角形
-        vkCmdEndRenderPass(CommandBuffers[i]);
-        if (vkEndCommandBuffer(CommandBuffers[i]) != VK_SUCCESS)
+        vkCmdBindVertexBuffers(CommandBuffers[I], 0, static_cast<uint32_t>(VertexBuffers.size()), VertexBuffers.data(), OffSets);
+        vkCmdBindIndexBuffer(CommandBuffers[I], IndexBufferCaches[0].Buffer, 0, VK_INDEX_TYPE_UINT16);
+        vkCmdBindDescriptorSets(CommandBuffers[I], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSet, 0, nullptr);
+        vkCmdBeginRenderPass(CommandBuffers[I], &RenderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+        vkCmdDrawIndexed(CommandBuffers[I], Assets::TestTriangleMeshIndices.Indices.size(), 1, 0, 0, 0); // 绘制一个三角形
+        vkCmdEndRenderPass(CommandBuffers[I]);
+        if (vkEndCommandBuffer(CommandBuffers[I]) != VK_SUCCESS)
         {
             spdlog::error("结束录制命令缓冲失败！");
             throw std::runtime_error("Failed to record command buffer!");
@@ -1006,6 +1089,27 @@ void FVulkanRenderer::CreateFramebuffers()
             spdlog::error("创建帧缓冲失败！");
             throw std::runtime_error("Failed to create framebuffer!");
         }
+    }
+}
+
+void FVulkanRenderer::CreateDescriptorSetLayout()
+{
+    VkDescriptorSetLayoutBinding CBufferLayoutBinding = {};
+    CBufferLayoutBinding.binding = 0;
+    CBufferLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    CBufferLayoutBinding.descriptorCount = 1;
+    CBufferLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    CBufferLayoutBinding.pImmutableSamplers = nullptr; // 可选
+
+    VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = {};
+    LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    LayoutCreateInfo.bindingCount = 1;
+    LayoutCreateInfo.pBindings = &CBufferLayoutBinding;
+
+    if (vkCreateDescriptorSetLayout(LogicalDevice, &LayoutCreateInfo, nullptr, &DescriptorSetLayout) != VK_SUCCESS) 
+    {
+        spdlog::error("创建描述符集布局失败！");
+        throw std::runtime_error("failed to create descriptor set layout!");
     }
 }
 

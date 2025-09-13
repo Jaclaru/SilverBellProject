@@ -6,6 +6,8 @@
 
 #include <memory>
 
+#include "BeforeRender.hh"
+
 namespace SilverBell::Renderer
 {
     class FVulkanRenderer;
@@ -18,10 +20,7 @@ namespace SilverBell::Application
     {
         Q_OBJECT
     public:
-        FRendererThread(SilverBell::Renderer::FVulkanRenderer* renderer, QObject* parent = nullptr)
-            : QThread(parent), Renderer(renderer), bRunning(true)
-        {
-        }
+        FRendererThread(Renderer::FVulkanRenderer* renderer, QObject* parent = nullptr);
 
         void run() override;
 
@@ -40,6 +39,8 @@ namespace SilverBell::Application
         std::atomic<bool> bRunning;
         std::atomic<bool> bNeedResize;
         int NewWidth, NewHeight;
+
+        TimeInfo TimeInformation;
     };
 
     class FRendererWindow : public QWindow
