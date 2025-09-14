@@ -195,8 +195,9 @@ void FRendererWindow::InitializeVulkanRenderer()
     tRenderer->CreateRenderPass();
     tRenderer->CreateDescriptorSetLayout();
     tRenderer->CreateGraphicsPipeline();
-    tRenderer->CreateFramebuffers();
     tRenderer->CreateCommandPool();
+    tRenderer->CreateDepthResources();
+    tRenderer->CreateFramebuffers();
     tRenderer->CreateTextureImage();
     tRenderer->CreateTextureImageView();
     tRenderer->CreateTextureSampler();

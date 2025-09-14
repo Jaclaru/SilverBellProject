@@ -33,10 +33,20 @@ namespace SilverBell::Assets
                             Math::Vec3(-0.5f, -0.5f, 0.0f),
                             Math::Vec3(0.5f, -0.5f, 0.0f),
                             Math::Vec3(0.5f, 0.5f, 0.0f),
-                            Math::Vec3(-0.5f, 0.5f, 0.0f)
+                            Math::Vec3(-0.5f, 0.5f, 0.0f),
+
+                            Math::Vec3( -0.5f, -0.5f, -0.5),
+                            Math::Vec3(0.5f, -0.5f, -0.5f),
+                            Math::Vec3( 0.5f, 0.5f, -0.5f),
+                            Math::Vec3(-0.5f, 0.5f, -0.5f)
                         },
 
         .Color =    {
+                            Math::Vec3(1.0f, 0.0f, 0.0f),
+                            Math::Vec3(0.0f, 1.0f, 0.0f),
+                            Math::Vec3(0.0f, 0.0f, 1.0f),
+                            Math::Vec3(1.0f, 1.0f, 1.0f),
+
                             Math::Vec3(1.0f, 0.0f, 0.0f),
                             Math::Vec3(0.0f, 1.0f, 0.0f),
                             Math::Vec3(0.0f, 0.0f, 1.0f),
@@ -47,13 +57,21 @@ namespace SilverBell::Assets
                             Math::Vec2(1.0f, 0.0f),
                             Math::Vec2(0.0f, 0.0f),
                             Math::Vec2(0.0f, 1.0f),
+                            Math::Vec2(1.0f, 1.0f),
+
+                            Math::Vec2(1.0f, 0.0f),
+                            Math::Vec2(0.0f, 0.0f),
+                            Math::Vec2(0.0f, 1.0f),
                             Math::Vec2(1.0f, 1.0f)
                         }
     };
 
     const MeshIndices TestTriangleMeshIndices =
     {
-        .Indices = { 0, 1, 2, 2, 3, 0 }
+        .Indices = {
+            0, 1, 2, 2, 3, 0,
+            4, 5, 6, 6, 7, 4
+        }
     };
 
     struct MVPMatrix

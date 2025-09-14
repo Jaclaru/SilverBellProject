@@ -622,7 +622,7 @@ void FVulkanRenderer::CreateImageViews()
     SwapChainImageViews.resize(SwapChainImages.size());
     for (size_t I = 0; I < SwapChainImages.size(); ++I)
     {
-        SwapChainImageViews[I] = CreateImageView(SwapChainImages[I], SwapChainImageFormat);
+        SwapChainImageViews[I] = CreateImageView(SwapChainImages[I], SwapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT);
     }
 }
 
@@ -640,10 +640,25 @@ void FVulkanRenderer::CreateRenderPass()
     VkAttachmentReference ColorAttachmentRef = {};
     ColorAttachmentRef.attachment = 0; // 附件索引
     ColorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; // 颜色附件布局
+
+    VkAttachmentDescription DepthAttachment = {};
+    DepthAttachment.format = FindDepthFormat();
+    DepthAttachment.samples = VK_SAMPLE_COUNT_1_BIT; // 使用1倍采样
+    DepthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; // 清除颜色附件
+    DepthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE; // 不存储深度附件
+    DepthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE; // 忽略模板附件加载
+    DepthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE; // 忽略模板附件存储
+    DepthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // 初始布局为未定义
+    DepthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL; // 最终布局为深度模板附件
+    VkAttachmentReference DepthAttachmentRef = {};
+    DepthAttachmentRef.attachment = 1; // 附件索引
+    DepthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
     VkSubpassDescription Subpass = {};
     Subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS; // 图形管线绑定点
     Subpass.colorAttachmentCount = 1;
     Subpass.pColorAttachments = &ColorAttachmentRef;
+    Subpass.pDepthStencilAttachment = &DepthAttachmentRef;
     VkSubpassDependency Dependency = {};
     Dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
     Dependency.dstSubpass = 0;
@@ -651,10 +666,12 @@ void FVulkanRenderer::CreateRenderPass()
     Dependency.srcAccessMask = 0;
     Dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     Dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+    std::array Attachments = { ColorAttachment, DepthAttachment };
     VkRenderPassCreateInfo RenderPassInfo = {};
     RenderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    RenderPassInfo.attachmentCount = 1;
-    RenderPassInfo.pAttachments = &ColorAttachment;
+    RenderPassInfo.attachmentCount = static_cast<uint32_t>(Attachments.size());
+    RenderPassInfo.pAttachments = Attachments.data();
     RenderPassInfo.subpassCount = 1;
     RenderPassInfo.pSubpasses = &Subpass;
     RenderPassInfo.dependencyCount = 1;
@@ -740,7 +757,13 @@ void FVulkanRenderer::CreateGraphicsPipeline()
     Multisampling.alphaToCoverageEnable = VK_FALSE; // 不启用alpha到覆盖
     Multisampling.alphaToOneEnable = VK_FALSE; // 不启用alpha到1
     // 深度和模板测试状态
-
+    VkPipelineDepthStencilStateCreateInfo DepthStencil = {};
+    DepthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    DepthStencil.depthTestEnable = VK_TRUE; // 启用深度测试
+    DepthStencil.depthWriteEnable = VK_TRUE; // 启用深度写入
+    DepthStencil.depthCompareOp = VK_COMPARE_OP_LESS; // 深度比较操作
+    DepthStencil.depthBoundsTestEnable = VK_FALSE; // 不启用深度边界
+    DepthStencil.stencilTestEnable = VK_FALSE;
     // 颜色和混合状态
     VkPipelineColorBlendAttachmentState ColorBlendAttachment = {};
     ColorBlendAttachment.blendEnable = VK_FALSE; // 不启用混合
@@ -795,7 +818,7 @@ void FVulkanRenderer::CreateGraphicsPipeline()
     PipelineCreateInfo.pViewportState = &ViewportState;
     PipelineCreateInfo.pRasterizationState = &Rasterizer;
     PipelineCreateInfo.pMultisampleState = &Multisampling;
-    PipelineCreateInfo.pDepthStencilState = nullptr; // 如果没有深度和模板测试
+    PipelineCreateInfo.pDepthStencilState = &DepthStencil; // 如果没有深度和模板测试
     PipelineCreateInfo.pColorBlendState = &ColorBlending;
     PipelineCreateInfo.pDynamicState = &DynamicState;
     PipelineCreateInfo.layout = PipelineLayout;
@@ -829,6 +852,22 @@ void FVulkanRenderer::CreateCommandPool()
         spdlog::error("创建命令池失败！");
         throw std::runtime_error("Failed to create command pool!");
     }
+}
+
+void FVulkanRenderer::CreateDepthResources()
+{
+    VkFormat DepthFormat = FindDepthFormat();
+    VMAImgCreateInfo CreateInfo = {};
+    CreateInfo.Width = SwapChainExtent.width;
+    CreateInfo.Height = SwapChainExtent.height;
+    CreateInfo.Tiling = VK_IMAGE_TILING_OPTIMAL;
+    CreateInfo.Format = DepthFormat;
+    CreateInfo.Usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    CreateInfo.MemoryUsage = VMA_MEMORY_USAGE_GPU_ONLY;
+    CreateInfo.AllocationCreateFlags = 0;
+    DepthImageCache = CreateImage(MemoryAllocator, CreateInfo);
+    DepthImageView = CreateImageView(DepthImageCache.Image, DepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+    TransitionImageLayout(DepthImageCache.Image, DepthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 }
 
 void FVulkanRenderer::CreateTextureImage()
@@ -868,7 +907,7 @@ void FVulkanRenderer::CreateTextureImage()
 
 void FVulkanRenderer::CreateTextureImageView()
 {
-    TextureImageView = CreateImageView(TextureImageCache.Image, VK_FORMAT_R8G8B8A8_UNORM);
+    TextureImageView = CreateImageView(TextureImageCache.Image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
 }
 
 void FVulkanRenderer::CreateTextureSampler()
@@ -1067,16 +1106,19 @@ void FVulkanRenderer::CreateCommandBuffers()
             spdlog::error("开始录制命令缓冲失败！");
             throw std::runtime_error("Failed to begin recording command buffer!");
         }
-        
+
+        std::array<VkClearValue, 2> ClearValues = {};
+        ClearValues[0].color = {0.f, 0.f, 0.f, 1.f};
+        ClearValues[1].depthStencil = { 1.0f, 0 };
+
         VkRenderPassBeginInfo RenderPassInfo = {};
         RenderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
         RenderPassInfo.renderPass = RenderPass;
         RenderPassInfo.framebuffer = SwapChainFramebuffers[Idx];
         RenderPassInfo.renderArea.offset = {.x = 0, .y = 0 };
         RenderPassInfo.renderArea.extent = SwapChainExtent;
-        VkClearValue ClearColor = { {{0.0f, 0.0f, 0.0f, 1.0f}} }; // 清除颜色为黑色
-        RenderPassInfo.clearValueCount = 1;
-        RenderPassInfo.pClearValues = &ClearColor;
+        RenderPassInfo.clearValueCount = static_cast<uint32_t>(ClearValues.size());
+        RenderPassInfo.pClearValues = ClearValues.data();
         vkCmdBindPipeline(CommandBuffers[Idx], VK_PIPELINE_BIND_POINT_GRAPHICS, GraphicsPipeline);
 
         // 绑定顶点缓冲区
@@ -1119,12 +1161,16 @@ void FVulkanRenderer::RecreateSwapChain(int Width, int Height)
     CreateImageViews();
     CreateRenderPass();
     CreateGraphicsPipeline();
+    CreateDepthResources();
     CreateFramebuffers();
     CreateCommandBuffers();
 }
 
 void FVulkanRenderer::CleanupSwapChain()
 {
+    vkDestroyImageView(LogicalDevice, DepthImageView, nullptr);
+    vmaDestroyImage(MemoryAllocator, DepthImageCache.Image, DepthImageCache.Allocation);
+
     vkFreeCommandBuffers(LogicalDevice, CommandPool, static_cast<uint32_t>(CommandBuffers.size()), CommandBuffers.data());
     for (auto Framebuffer : SwapChainFramebuffers)
     {
@@ -1149,11 +1195,13 @@ void FVulkanRenderer::CreateFramebuffers()
 
     for (size_t i = 0; i < SwapChainImageViews.size(); ++i)
     {
+        std::array Attachments = { SwapChainImageViews[i], DepthImageView};
+
         VkFramebufferCreateInfo CreateInfo = {};
         CreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         CreateInfo.renderPass = RenderPass;
-        CreateInfo.attachmentCount = 1;
-        CreateInfo.pAttachments = &SwapChainImageViews[i];
+        CreateInfo.attachmentCount = static_cast<uint32_t>(Attachments.size());
+        CreateInfo.pAttachments = Attachments.data();
         CreateInfo.width = SwapChainExtent.width;
         CreateInfo.height = SwapChainExtent.height;
         CreateInfo.layers = 1;
@@ -1420,6 +1468,19 @@ void FVulkanRenderer::TransitionImageLayout(VkImage Image, VkFormat Format, VkIm
         SourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
         DestinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
     }
+    else if (OldLayout == VK_IMAGE_LAYOUT_UNDEFINED && NewLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+    {
+        Barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+        if (HasStencilComponent(Format)) 
+        {
+            Barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+        }
+        Barrier.srcAccessMask = 0;
+        Barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+        SourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        DestinationStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+    }
     else 
     {
         spdlog::error("不支持的图像布局转换！");
@@ -1431,14 +1492,14 @@ void FVulkanRenderer::TransitionImageLayout(VkImage Image, VkFormat Format, VkIm
     EndSingleTimeCommands(CommandBuffer);
 }
 
-VkImageView FVulkanRenderer::CreateImageView(VkImage Image, VkFormat Format) const
+VkImageView FVulkanRenderer::CreateImageView(VkImage Image, VkFormat Format, VkImageAspectFlags AspectFlags) const
 {
     VkImageViewCreateInfo ViewInfo = {};
     ViewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     ViewInfo.image = Image;
     ViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
     ViewInfo.format = Format;
-    ViewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    ViewInfo.subresourceRange.aspectMask = AspectFlags;
     ViewInfo.subresourceRange.baseMipLevel = 0;
     ViewInfo.subresourceRange.levelCount = 1;
     ViewInfo.subresourceRange.baseArrayLayer = 0;
@@ -1451,4 +1512,24 @@ VkImageView FVulkanRenderer::CreateImageView(VkImage Image, VkFormat Format) con
     }
 
     return ImageView;
+}
+
+VkFormat FVulkanRenderer::FindSupportedFormat(const std::vector<VkFormat>& Candidates, VkImageTiling Tiling,
+    VkFormatFeatureFlags Features)
+{
+    for (VkFormat Format : Candidates)
+    {
+        VkFormatProperties Props;
+        vkGetPhysicalDeviceFormatProperties(PhysicalDevice, Format, &Props);
+        if (Tiling == VK_IMAGE_TILING_LINEAR && (Props.linearTilingFeatures & Features) == Features)
+        {
+            return Format;
+        }
+        if (Tiling == VK_IMAGE_TILING_OPTIMAL && (Props.optimalTilingFeatures & Features) == Features)
+        {
+            return Format;
+        }
+    }
+    spdlog::error("找不到支持的格式！");
+    throw std::runtime_error("failed to find supported format!");
 }

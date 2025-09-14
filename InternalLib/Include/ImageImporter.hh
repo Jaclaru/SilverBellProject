@@ -17,14 +17,14 @@ namespace SilverBell
         struct ImageInfo
         {
             unsigned char* Pixels = nullptr;
-            int Width = 0;
-            int Height = 0;
-            int Channels = 0; // 通道数，默认为4
+            uint32_t Width = 0;
+            uint32_t Height = 0;
+            uint8_t Channels = 0; // 通道数，默认为4
         };
 
         static std::optional<ImageInfo> ImportImage(std::string_view FilePath);
 
-        static void FreeImage(const ImageInfo& ImageInfo);
+        static void FreeImage(ImageInfo& ImageInfo);
 
     };
 }

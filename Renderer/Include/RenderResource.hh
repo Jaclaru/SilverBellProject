@@ -209,8 +209,9 @@ namespace SilverBell::Renderer
 
     struct VMAImgCreateInfo
     {
-        int Width = 0;
-        int Height = 0;
+        uint32_t Width = 0;
+        uint32_t Height = 0;
+        VkImageTiling Tiling = VK_IMAGE_TILING_OPTIMAL;
         VkFormat Format = VK_FORMAT_R8G8B8A8_UNORM;
         VkImageUsageFlags Usage = 0;
         VmaMemoryUsage MemoryUsage = VMA_MEMORY_USAGE_GPU_ONLY;
@@ -239,7 +240,7 @@ namespace SilverBell::Renderer
         ImageInfo.mipLevels = 1;
         ImageInfo.arrayLayers = 1;
         ImageInfo.format = CreateInfo.Format;
-        ImageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+        ImageInfo.tiling = CreateInfo.Tiling;
         ImageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         ImageInfo.usage = CreateInfo.Usage;
         ImageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;

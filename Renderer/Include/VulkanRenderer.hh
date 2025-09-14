@@ -58,6 +58,8 @@ namespace SilverBell::Renderer
 
         void CreateImageViews();
 
+        void CreateDepthResources();
+
         void CreateRenderPass();
 
         void CreateFramebuffers();
@@ -121,7 +123,23 @@ namespace SilverBell::Renderer
 
         void TransitionImageLayout(VkImage Image, VkFormat Format, VkImageLayout OldLayout, VkImageLayout NewLayout) const;
 
-        VkImageView CreateImageView(VkImage Image, VkFormat Format) const;
+        VkImageView CreateImageView(VkImage Image, VkFormat Format, VkImageAspectFlags AspectFlags) const;
+
+        VkFormat FindSupportedFormat(const std::vector<VkFormat>& Candidates, VkImageTiling Tiling, VkFormatFeatureFlags Features);
+
+        VkFormat FindDepthFormat()
+        {
+            return FindSupportedFormat(
+                { VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
+                VK_IMAGE_TILING_OPTIMAL,
+                VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
+            );
+        }
+
+        static bool HasStencilComponent(VkFormat Format)
+        {
+            return Format == VK_FORMAT_D32_SFLOAT_S8_UINT || Format == VK_FORMAT_D24_UNORM_S8_UINT;
+        }
 
         // Vulkan实例扩展
         std::vector<const char*> InstanceExtensions;
@@ -187,6 +205,10 @@ namespace SilverBell::Renderer
         VkImageView TextureImageView;
         // 纹理采样器
         VkSampler TextureSampler;
+        // 深度图像
+        VkImageCache DepthImageCache;
+        // 深度图像视图
+        VkImageView DepthImageView;
 
         // VMA内存分配
         VmaAllocator MemoryAllocator;
