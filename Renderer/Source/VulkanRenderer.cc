@@ -25,7 +25,7 @@
 
 #include <spdlog/spdlog.h>
 
-#include "Mesh.hh"
+#include "ModelImporter.hh"
 
 using namespace SilverBell::Renderer;
 
@@ -148,6 +148,12 @@ FVulkanRenderer::FVulkanRenderer() :
 FVulkanRenderer::~FVulkanRenderer()
 {
     CleanUp();
+
+    if (LoadedModel)
+    {
+        delete LoadedModel;
+        LoadedModel = nullptr;
+    }
 }
 
 void FVulkanRenderer::SetRequiredInstanceExtensions(const char** Exts, int Len)
@@ -741,7 +747,7 @@ void FVulkanRenderer::CreateGraphicsPipeline()
     Rasterizer.rasterizerDiscardEnable = VK_FALSE; // 不丢弃片段
     Rasterizer.polygonMode = VK_POLYGON_MODE_FILL; // 填充模式
     Rasterizer.lineWidth = 1.0f; // 线宽
-    Rasterizer.cullMode = VK_CULL_MODE_BACK_BIT; // 背面剔除
+    Rasterizer.cullMode = VK_CULL_MODE_NONE; // 背面剔除
     Rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE; // 顺时针为前面
     Rasterizer.depthBiasEnable = VK_FALSE; // 不启用深度偏移
     Rasterizer.depthBiasConstantFactor = 0.0f; // 深度偏移常数因子
@@ -872,7 +878,7 @@ void FVulkanRenderer::CreateDepthResources()
 
 void FVulkanRenderer::CreateTextureImage()
 {
-    auto ImportInfo = FImageImporter::ImportImage("Assets/Images/README/cfbf9f8d34eb8db3378dfd6cf1669dee16264389.jpg");
+    auto ImportInfo = FImageImporter::ImportImage("Assets/Models/viking_room.png");
     if (ImportInfo.has_value())
     {
         VkDeviceSize ImageSize = static_cast<VkDeviceSize>(ImportInfo->Width) * ImportInfo->Height * 4;
@@ -937,29 +943,36 @@ void FVulkanRenderer::CreateTextureSampler()
 
 void FVulkanRenderer::CreateVertexBuffers()
 {
+    auto Model = FModelImporter::ImporterModel("Assets/Models/viking_room.obj");
+
+    if (Model == nullptr)return;;
+
+    LoadedModel = Model;
+    const auto& Mesh = Model->MeshData;
+
     // 创建临时缓冲区
-    StagingBufferCaches = CreateBuffer(Assets::TestTriangleMesh, MemoryAllocator, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+    StagingBufferCaches = CreateBuffer(Mesh, MemoryAllocator, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
         VMA_MEMORY_USAGE_CPU_ONLY, 0);
 
     // 写入顶点数据
     void* Data = nullptr;
     std::size_t DataSize = StagingBufferCaches[0].BufferSize;
     vmaMapMemory(MemoryAllocator, StagingBufferCaches[0].Allocation, &Data);
-    std::memcpy(Data, (void*)Assets::TestTriangleMesh.Positions.data(), DataSize);
+    std::memcpy(Data, (void*)Mesh.Positions.data(), DataSize);
     vmaUnmapMemory(MemoryAllocator, StagingBufferCaches[0].Allocation);
     Data = nullptr;
     DataSize = StagingBufferCaches[1].BufferSize;
     vmaMapMemory(MemoryAllocator, StagingBufferCaches[1].Allocation, &Data);
-    std::memcpy(Data, (void*)Assets::TestTriangleMesh.Color.data(), DataSize);
+    std::memcpy(Data, (void*)Mesh.Color.data(), DataSize);
     vmaUnmapMemory(MemoryAllocator, StagingBufferCaches[1].Allocation);
     Data = nullptr;
     DataSize = StagingBufferCaches[2].BufferSize;
     vmaMapMemory(MemoryAllocator, StagingBufferCaches[2].Allocation, &Data);
-    std::memcpy(Data, (void*)Assets::TestTriangleMesh.TexCoord.data(), DataSize);
+    std::memcpy(Data, (void*)Mesh.TexCoord.data(), DataSize);
     vmaUnmapMemory(MemoryAllocator, StagingBufferCaches[2].Allocation);
 
     // 创建顶点缓冲区
-    VertexBufferCaches = CreateBuffer(Assets::TestTriangleMesh, MemoryAllocator,
+    VertexBufferCaches = CreateBuffer(Mesh, MemoryAllocator,
         static_cast<VkBufferUsageFlagBits>(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT),
         VMA_MEMORY_USAGE_GPU_ONLY, 0);
 
@@ -973,25 +986,25 @@ void FVulkanRenderer::CreateVertexBuffers()
 
 void FVulkanRenderer::CreateIndexBuffer()
 {
-    // 创建临时缓冲区
-    StagingBufferCaches = CreateBuffer(Assets::TestTriangleMeshIndices, MemoryAllocator, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VMA_MEMORY_USAGE_CPU_ONLY, 0);
-    // 写入顶点索引数据
-    void* Data = nullptr;
-    std::size_t DataSize = StagingBufferCaches[0].BufferSize;
-    vmaMapMemory(MemoryAllocator, StagingBufferCaches[0].Allocation, &Data);
-    std::memcpy(Data, (void*)Assets::TestTriangleMeshIndices.Indices.data(), DataSize);
-    vmaUnmapMemory(MemoryAllocator, StagingBufferCaches[0].Allocation);
+    //// 创建临时缓冲区
+    //StagingBufferCaches = CreateBuffer(Assets::TestTriangleMeshIndices, MemoryAllocator, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+    //    VMA_MEMORY_USAGE_CPU_ONLY, 0);
+    //// 写入顶点索引数据
+    //void* Data = nullptr;
+    //std::size_t DataSize = StagingBufferCaches[0].BufferSize;
+    //vmaMapMemory(MemoryAllocator, StagingBufferCaches[0].Allocation, &Data);
+    //std::memcpy(Data, (void*)Assets::TestTriangleMeshIndices.Indices.data(), DataSize);
+    //vmaUnmapMemory(MemoryAllocator, StagingBufferCaches[0].Allocation);
 
-    IndexBufferCaches = CreateBuffer(Assets::TestTriangleMeshIndices, MemoryAllocator, 
-        static_cast<VkBufferUsageFlagBits>(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT),
-        VMA_MEMORY_USAGE_GPU_ONLY, 0);
-    CopyBuffer(StagingBufferCaches, IndexBufferCaches);
-    // 销毁临时缓冲区
-    for (const auto& BufferCache : StagingBufferCaches)
-    {
-        vmaDestroyBuffer(MemoryAllocator, BufferCache.Buffer, BufferCache.Allocation);
-    }
+    //IndexBufferCaches = CreateBuffer(Assets::TestTriangleMeshIndices, MemoryAllocator, 
+    //    static_cast<VkBufferUsageFlagBits>(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT),
+    //    VMA_MEMORY_USAGE_GPU_ONLY, 0);
+    //CopyBuffer(StagingBufferCaches, IndexBufferCaches);
+    //// 销毁临时缓冲区
+    //for (const auto& BufferCache : StagingBufferCaches)
+    //{
+    //    vmaDestroyBuffer(MemoryAllocator, BufferCache.Buffer, BufferCache.Allocation);
+    //}
 }
 
 
@@ -1126,10 +1139,10 @@ void FVulkanRenderer::CreateCommandBuffers()
         for (int I = 0; I < VertexBuffers.size(); ++I)VertexBuffers[I] = VertexBufferCaches[I].Buffer;
         VkDeviceSize OffSets[] = {0, 0, 0};
         vkCmdBindVertexBuffers(CommandBuffers[Idx], 0, static_cast<uint32_t>(VertexBuffers.size()), VertexBuffers.data(), OffSets);
-        vkCmdBindIndexBuffer(CommandBuffers[Idx], IndexBufferCaches[0].Buffer, 0, VK_INDEX_TYPE_UINT16);
+        //vkCmdBindIndexBuffer(CommandBuffers[Idx], IndexBufferCaches[0].Buffer, 0, VK_INDEX_TYPE_UINT32);
         vkCmdBindDescriptorSets(CommandBuffers[Idx], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSet, 0, nullptr);
         vkCmdBeginRenderPass(CommandBuffers[Idx], &RenderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-        vkCmdDrawIndexed(CommandBuffers[Idx], Assets::TestTriangleMeshIndices.Indices.size(), 1, 0, 0, 0); // 绘制一个三角形
+        vkCmdDraw(CommandBuffers[Idx], LoadedModel->MeshData.Positions.size(), 1, 0, 0); // 绘制一个三角形
         vkCmdEndRenderPass(CommandBuffers[Idx]);
         if (vkEndCommandBuffer(CommandBuffers[Idx]) != VK_SUCCESS)
         {

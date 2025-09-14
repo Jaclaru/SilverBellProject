@@ -103,6 +103,9 @@ FetchContent_MakeAvailable(yalantinglibs)
 # stb
 set(STB_INCLUDE_DIR "${THIRD_PARTY_DIR}/stb/Include" CACHE INTERNAL "stb Include")
 
+# tinyobjloader
+set(TINYOBJLOADER_INCLUDE_DIR "${THIRD_PARTY_DIR}/tinyobjloader/Include" CACHE INTERNAL "tinyobjloader Include")
+
 ########################## 子目录 ##########################
 add_subdirectory(Application)
 add_subdirectory(Renderer)

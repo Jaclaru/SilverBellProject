@@ -24,54 +24,7 @@ namespace SilverBell::Assets
 
     struct MeshIndices
     {
-        std::vector<uint16_t> Indices;
-    };
-
-    const BaseMesh TestTriangleMesh =
-    {
-        .Positions = {
-                            Math::Vec3(-0.5f, -0.5f, 0.0f),
-                            Math::Vec3(0.5f, -0.5f, 0.0f),
-                            Math::Vec3(0.5f, 0.5f, 0.0f),
-                            Math::Vec3(-0.5f, 0.5f, 0.0f),
-
-                            Math::Vec3( -0.5f, -0.5f, -0.5),
-                            Math::Vec3(0.5f, -0.5f, -0.5f),
-                            Math::Vec3( 0.5f, 0.5f, -0.5f),
-                            Math::Vec3(-0.5f, 0.5f, -0.5f)
-                        },
-
-        .Color =    {
-                            Math::Vec3(1.0f, 0.0f, 0.0f),
-                            Math::Vec3(0.0f, 1.0f, 0.0f),
-                            Math::Vec3(0.0f, 0.0f, 1.0f),
-                            Math::Vec3(1.0f, 1.0f, 1.0f),
-
-                            Math::Vec3(1.0f, 0.0f, 0.0f),
-                            Math::Vec3(0.0f, 1.0f, 0.0f),
-                            Math::Vec3(0.0f, 0.0f, 1.0f),
-                            Math::Vec3(1.0f, 1.0f, 1.0f)
-                        },
-
-        .TexCoord = {
-                            Math::Vec2(1.0f, 0.0f),
-                            Math::Vec2(0.0f, 0.0f),
-                            Math::Vec2(0.0f, 1.0f),
-                            Math::Vec2(1.0f, 1.0f),
-
-                            Math::Vec2(1.0f, 0.0f),
-                            Math::Vec2(0.0f, 0.0f),
-                            Math::Vec2(0.0f, 1.0f),
-                            Math::Vec2(1.0f, 1.0f)
-                        }
-    };
-
-    const MeshIndices TestTriangleMeshIndices =
-    {
-        .Indices = {
-            0, 1, 2, 2, 3, 0,
-            4, 5, 6, 6, 7, 4
-        }
+        std::vector<uint32_t> Indices;
     };
 
     struct MVPMatrix

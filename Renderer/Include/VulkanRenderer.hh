@@ -11,6 +11,11 @@
 #include "Mixins.hh"
 #include "RenderResource.hh"
 
+namespace SilverBell
+{
+    struct Model;
+}
+
 namespace SilverBell::Renderer
 {
     class RENDERER_API FVulkanRenderer : public NonCopyable
@@ -212,6 +217,9 @@ namespace SilverBell::Renderer
 
         // VMA内存分配
         VmaAllocator MemoryAllocator;
+
+        // 模型
+        Model* LoadedModel = nullptr;
     };
 }
 
