@@ -3,12 +3,14 @@ struct VSInput
 {
     float3 Pos : POSITION;
     float3 Color : COLOR;
+    float2 TexCoord : TEXCOORD;
 };
 
 struct VSOutput
 {
     float4 Pos : SV_POSITION;
-    float3 Color : COLOR0;
+    float3 Color : COLOR;
+    float2 TexCoord : TEXCOORD;
 };
 
 // MVP变换矩阵
@@ -27,5 +29,6 @@ VSOutput Main(VSInput Input)
     float4 HomogeneousPos = mul(Projection, ViewPos); // 齐次坐标
     output.Pos = HomogeneousPos;
     output.Color = Input.Color;
+    output.TexCoord = Input.TexCoord;
     return output;
 }

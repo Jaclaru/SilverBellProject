@@ -66,7 +66,6 @@ void FRendererThread::run()
 
             if (currentTime - LastTime >= 1.0) // 每秒统计一次
             {
-
                 FPS = FrameCount / (currentTime - LastTime);
                 FrameCount = 0;
                 LastTime = currentTime;
@@ -198,6 +197,9 @@ void FRendererWindow::InitializeVulkanRenderer()
     tRenderer->CreateGraphicsPipeline();
     tRenderer->CreateFramebuffers();
     tRenderer->CreateCommandPool();
+    tRenderer->CreateTextureImage();
+    tRenderer->CreateTextureImageView();
+    tRenderer->CreateTextureSampler();
     tRenderer->CreateVertexBuffers();
     tRenderer->CreateIndexBuffer();
     tRenderer->CreateConstantBuffer();

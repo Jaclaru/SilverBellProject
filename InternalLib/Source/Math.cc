@@ -23,25 +23,25 @@ namespace SilverBell::Math
     // }
 
     // https://blog.csdn.net/WillWinston/article/details/125746107
-    Vec3 ToEulerAngle(const Quaternion& q)   // 确保pitch的范围[-PI/2, PI/2]
+    Vec3 ToEulerAngle(const Quaternion& Quad)   // 确保pitch的范围[-PI/2, PI/2]
     {                                               // yaw和roll都是[-PI, PI]
         double angles[3];
 
         // yaw (y-axis rotation)
-        double sinr_cosp = 2 * (q.w() * q.y() -q.x() * q.z());
-        double cosr_cosp = 1 - 2 * (q.y() * q.y() + q.z() * q.z());
+        double sinr_cosp = 2 * (Quad.w() * Quad.y() -Quad.x() * Quad.z());
+        double cosr_cosp = 1 - 2 * (Quad.y() * Quad.y() + Quad.z() * Quad.z());
         angles[0] = std::atan2(sinr_cosp, cosr_cosp);
 
         // pitch (z-axis rotation)
-        double sinp = 2 * (q.w() * q.z() + q.x() * q.y());
+        double sinp = 2 * (Quad.w() * Quad.z() + Quad.x() * Quad.y());
         if (std::abs(sinp) >= 1)
             angles[1] = std::copysign(PI / 2, sinp); // use 90 degrees if out of range
         else
             angles[1] = std::asin(sinp);
 
         // roll (x-axis rotation)
-        double siny_cosp = 2 * (q.w() * q.x() - q.y() * q.z());
-        double cosy_cosp = 1 - 2 * (q.x() * q.x() + q.z() * q.z());
+        double siny_cosp = 2 * (Quad.w() * Quad.x() - Quad.y() * Quad.z());
+        double cosy_cosp = 1 - 2 * (Quad.x() * Quad.x() + Quad.z() * Quad.z());
         angles[2] = std::atan2(siny_cosp, cosy_cosp);     
 
         angles[0] *= 180 / PI;  // 有一点点精度问题，可以忽略
@@ -51,9 +51,9 @@ namespace SilverBell::Math
         return Vec3(angles[2], angles[0], angles[1]);
     }
 
-    Quaternion ToQuaternion(Vec3 eulerAngle)
+    Quaternion ToQuaternion(const Vec3& EulerAngle)
     {
-        Vec3 radians = ToRadians(eulerAngle) ;  // 右手系，Y向上
+        Vec3 radians = ToRadians(EulerAngle) ;  // 右手系，Y向上
         Eigen::AngleAxisf yaw = Eigen::AngleAxisf(radians(1),Vec3::UnitY()); 
         Eigen::AngleAxisf pitch = Eigen::AngleAxisf(radians(2),Vec3::UnitZ());  
         Eigen::AngleAxisf roll = Eigen::AngleAxisf(radians(0),Vec3::UnitX());
@@ -100,10 +100,10 @@ namespace SilverBell::Math
     //     return roll * pitch * yaw;  // 有顺序
     // }
 
-    Mat4 LookAt(Vec3 eye, Vec3 center, Vec3 up)
+    Mat4 LookAt(const Vec3& Eye, const Vec3& Center, const Vec3& Up)
     {
-        Vec3 f = (center - eye).normalized();
-        Vec3 s = f.cross(up).normalized();
+        Vec3 f = (Center - Eye).normalized();
+        Vec3 s = f.cross(Up).normalized();
         Vec3 u = s.cross(f);
 
         Mat4 mat = Mat4::Identity();
@@ -116,23 +116,23 @@ namespace SilverBell::Math
         mat(2, 0) =-f.x();
         mat(2, 1) =-f.y();
         mat(2, 2) =-f.z();
-        mat(0, 3) =-s.dot(eye);
-        mat(1, 3) =-u.dot(eye);
-        mat(2, 3) = f.dot(eye);
+        mat(0, 3) =-s.dot(Eye);
+        mat(1, 3) =-u.dot(Eye);
+        mat(2, 3) = f.dot(Eye);
 
         return mat;
     }
 
-    Mat4 Perspective(float fovy, float aspect, float near, float far)
+    Mat4 Perspective(float Fov, float Aspect, float Near, float Far)
     {
-        float const tanHalfFovy = tan(fovy / 2.0f);
+        float const tanHalfFovy = tan(Fov / 2.0f);
 
         Mat4 mat = Mat4::Zero();
-        mat(0, 0) = 1.0f / (aspect * tanHalfFovy);
+        mat(0, 0) = 1.0f / (Aspect * tanHalfFovy);
         mat(1, 1) = 1.0f / (tanHalfFovy);
-        mat(2, 2) = far / (near - far);
+        mat(2, 2) = Far / (Near - Far);
         mat(3, 2) = - 1.0f;
-        mat(2, 3) = -(far * near) / (far - near);
+        mat(2, 3) = -(Far * Near) / (Far - Near);
         return mat;
     }
 

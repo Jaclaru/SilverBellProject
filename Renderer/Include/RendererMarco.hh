@@ -21,4 +21,4 @@
 #endif
 
 // Release模式下禁用Vulkan调试层，不然会崩溃
-#define VULKAN_DEBUG_ENABLE 0
+#define VULKAN_DEBUG_ENABLE 1

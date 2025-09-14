@@ -10,6 +10,7 @@ namespace SilverBell::Assets
     {
         std::vector<Math::Vec3> Positions;
         std::vector<Math::Vec3> Color;
+        std::vector<Math::Vec2> TexCoord;
     };
 
     struct Mesh
@@ -41,6 +42,13 @@ namespace SilverBell::Assets
                             Math::Vec3(0.0f, 0.0f, 1.0f),
                             Math::Vec3(1.0f, 1.0f, 1.0f)
                         },
+
+        .TexCoord = {
+                            Math::Vec2(1.0f, 0.0f),
+                            Math::Vec2(0.0f, 0.0f),
+                            Math::Vec2(0.0f, 1.0f),
+                            Math::Vec2(1.0f, 1.0f)
+                        }
     };
 
     const MeshIndices TestTriangleMeshIndices =

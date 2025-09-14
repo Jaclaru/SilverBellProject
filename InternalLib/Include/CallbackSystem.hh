@@ -37,7 +37,7 @@ namespace SilverBell::TMP
     public:
 
         template<typename T>
-        requires IsConvertibleToVariantValue<T, VariantType>
+            requires IsConvertibleToVariantValue<T, VariantType>
         void SetParameter(size_t Index, T Value)
         {
             if (Index >= Params.size())
@@ -70,25 +70,25 @@ namespace SilverBell::TMP
                 return;
             }
             auto Invoker = [this, F = std::forward<Func>(Callback)]() -> void
-            {
-                if constexpr (Traits::Arity == 0)
                 {
-                    F();
-                }
-                else
-                {
-                    try
+                    if constexpr (Traits::Arity == 0)
                     {
-                        auto Args = ExtractArgs<Traits>();
-                        std::apply(F, Args);
+                        F();
                     }
-                    catch (const std::exception& E)
+                    else
                     {
-                        spdlog::warn("回调函数异常：{}", E.what());
-                        throw std::runtime_error("参数类型不匹配: " + std::string(E.what()));
+                        try
+                        {
+                            auto Args = ExtractArgs<Traits>();
+                            std::apply(F, Args);
+                        }
+                        catch (const std::exception& E)
+                        {
+                            spdlog::warn("回调函数异常：{}", E.what());
+                            throw std::runtime_error("回调函数异常：" + std::string(E.what()));
+                        }
                     }
-                }
-            };
+                };
             Callbacks.push_back(Invoker);
         }
 
@@ -101,13 +101,13 @@ namespace SilverBell::TMP
         // 触发所有回调
         void Trigger() const
         {
-            for (auto& Callback : Callbacks) 
+            for (auto& Callback : Callbacks)
             {
-                try 
+                try
                 {
                     Callback();
                 }
-                catch (const std::exception& E) 
+                catch (const std::exception& E)
                 {
                     spdlog::error("回调函数出错：{}", E.what());
                 }
@@ -118,9 +118,9 @@ namespace SilverBell::TMP
 
         void ClearParameters() { Params.clear(); }
 
-        size_t CallbackCount() const { return Callbacks.size(); }
+        [[maybe_unused]] size_t CallbackCount() const { return Callbacks.size(); }   // NOLINT(modernize-use-nodiscard)
 
-        size_t ParameterCount() const { return Params.size(); }
+        [[maybe_unused]] size_t ParameterCount() const { return Params.size(); }  // NOLINT(modernize-use-nodiscard)
 
         // 获取指定索引的参数
         template<typename T>
@@ -145,7 +145,7 @@ namespace SilverBell::TMP
         // 检查指定索引的参数是否为特定类型
         template<typename T>
         requires IsInVariantValue<T, VariantType>
-        bool IsParameterType(size_t Index) const
+        [[nodiscard]] bool IsParameterType(size_t Index) const
         {
             if (Index >= Params.size()) 
             {

@@ -20,6 +20,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "ImageImporter.hh"
 #include "ShaderManager.hh"
 
 #include <spdlog/spdlog.h>
@@ -199,6 +200,10 @@ void FVulkanRenderer::CleanUp()
     {
         vmaDestroyBuffer(MemoryAllocator, BufferCache.Buffer, BufferCache.Allocation);
     }
+    // 销毁纹理
+    vmaDestroyImage(MemoryAllocator, TextureImageCache.Image, TextureImageCache.Allocation);
+    vkDestroySampler(LogicalDevice, TextureSampler, nullptr);
+    vkDestroyImageView(LogicalDevice, TextureImageView, nullptr);
 
     vmaDestroyAllocator(MemoryAllocator);
 
@@ -404,7 +409,7 @@ bool FVulkanRenderer::IsDeviceSuitable(VkPhysicalDevice Device)
     // 检查设备是否支持必要的功能
     return (DeviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) &&
         DeviceFeatures.geometryShader && FamilyIndices.IsComplete() &&
-        bExtensionsSupported && bSwapChainAdequate; // 这里可以添加更多的检查条件
+        bExtensionsSupported && bSwapChainAdequate && DeviceFeatures.samplerAnisotropy; // 这里可以添加更多的检查条件
 }
 
 bool FVulkanRenderer::CheckValidationLayerSupport()
@@ -509,6 +514,7 @@ void FVulkanRenderer::CreateLogicalDevice()
     VkPhysicalDeviceFeatures DeviceFeatures = {};
     DeviceFeatures.geometryShader = VK_TRUE; // 启用几何着色器
     DeviceFeatures.fillModeNonSolid = VK_TRUE; // 启用非实心填充模式
+    DeviceFeatures.samplerAnisotropy = VK_TRUE; // 启用各向异性过滤
 
     // 创建逻辑设备
     VkDeviceCreateInfo DeviceCreateInfo = {};
@@ -614,27 +620,9 @@ void FVulkanRenderer::CreateSwapChain(int Width, int Height)
 void FVulkanRenderer::CreateImageViews()
 {
     SwapChainImageViews.resize(SwapChainImages.size());
-    for (size_t i = 0; i < SwapChainImages.size(); ++i)
+    for (size_t I = 0; I < SwapChainImages.size(); ++I)
     {
-        VkImageViewCreateInfo CreateInfo = {};
-        CreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        CreateInfo.image = SwapChainImages[i];
-        CreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        CreateInfo.format = SwapChainImageFormat;
-        CreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-        CreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-        CreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-        CreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-        CreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        CreateInfo.subresourceRange.baseMipLevel = 0;
-        CreateInfo.subresourceRange.levelCount = 1;
-        CreateInfo.subresourceRange.baseArrayLayer = 0;
-        CreateInfo.subresourceRange.layerCount = 1;
-        if (vkCreateImageView(LogicalDevice, &CreateInfo, nullptr, &SwapChainImageViews[i]) != VK_SUCCESS)
-        {
-            spdlog::error("创建图像视图失败！");
-            throw std::runtime_error("Failed to create image views!");
-        }
+        SwapChainImageViews[I] = CreateImageView(SwapChainImages[I], SwapChainImageFormat);
     }
 }
 
@@ -843,6 +831,71 @@ void FVulkanRenderer::CreateCommandPool()
     }
 }
 
+void FVulkanRenderer::CreateTextureImage()
+{
+    auto ImportInfo = FImageImporter::ImportImage("Assets/Images/README/cfbf9f8d34eb8db3378dfd6cf1669dee16264389.jpg");
+    if (ImportInfo.has_value())
+    {
+        VkDeviceSize ImageSize = static_cast<VkDeviceSize>(ImportInfo->Width) * ImportInfo->Height * 4;
+
+        auto BufferCache = CreateBufferPack(ImageSize, MemoryAllocator, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VMA_MEMORY_USAGE_CPU_ONLY, 0);
+
+        void* Data;
+        vmaMapMemory(MemoryAllocator, BufferCache[0].Allocation, &Data);
+        std::memcpy(Data, ImportInfo->Pixels, ImageSize);
+        vmaUnmapMemory(MemoryAllocator, BufferCache[0].Allocation);
+        FImageImporter::FreeImage(ImportInfo.value());
+
+        VMAImgCreateInfo CreateInfo = {};
+        CreateInfo.Width = ImportInfo->Width;
+        CreateInfo.Height = ImportInfo->Height;
+        CreateInfo.Format = VK_FORMAT_R8G8B8A8_UNORM;
+        CreateInfo.Usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+        CreateInfo.MemoryUsage = VMA_MEMORY_USAGE_GPU_ONLY;
+        CreateInfo.AllocationCreateFlags = 0;
+
+        TextureImageCache = CreateImage(MemoryAllocator, CreateInfo);
+        TransitionImageLayout(TextureImageCache.Image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        CopyBufferToImage(BufferCache[0], TextureImageCache);
+        // 为了了在着色器中读取纹理，我们需要将图像布局转换为着色器读取专用
+        TransitionImageLayout(TextureImageCache.Image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+        // 清理临时缓冲区
+        vmaDestroyBuffer(MemoryAllocator, BufferCache[0].Buffer, BufferCache[0].Allocation);
+    }
+}
+
+void FVulkanRenderer::CreateTextureImageView()
+{
+    TextureImageView = CreateImageView(TextureImageCache.Image, VK_FORMAT_R8G8B8A8_UNORM);
+}
+
+void FVulkanRenderer::CreateTextureSampler()
+{
+    VkSamplerCreateInfo SamplerCreateInfo = {};
+    SamplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    SamplerCreateInfo.magFilter = VK_FILTER_LINEAR; // 放大过滤器
+    SamplerCreateInfo.minFilter = VK_FILTER_LINEAR; // 缩小过滤器
+    SamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT; // U方向重复
+    SamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT; // V方向重复
+    SamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT; // W方向重复
+    SamplerCreateInfo.anisotropyEnable = VK_TRUE; // 启用各向异性过滤
+    SamplerCreateInfo.maxAnisotropy = 16; // 最大各向异性等级
+    SamplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK; // 边界颜色
+    SamplerCreateInfo.unnormalizedCoordinates = VK_FALSE; // 使用归一化坐标
+    SamplerCreateInfo.compareEnable = VK_FALSE; // 不启用比较操作
+    SamplerCreateInfo.compareOp = VK_COMPARE_OP_ALWAYS; // 比较操作
+    SamplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR; // 线性mipmap过滤
+    SamplerCreateInfo.mipLodBias = 0.0f; // LOD偏差
+    SamplerCreateInfo.minLod = 0.0f; // 最小LOD
+    SamplerCreateInfo.maxLod = 0.0f; // 最大LOD
+    if (vkCreateSampler(LogicalDevice, &SamplerCreateInfo, nullptr, &TextureSampler) != VK_SUCCESS)
+    {
+        spdlog::error("创建纹理采样器失败！");
+    }
+}
+
 void FVulkanRenderer::CreateVertexBuffers()
 {
     // 创建临时缓冲区
@@ -860,6 +913,11 @@ void FVulkanRenderer::CreateVertexBuffers()
     vmaMapMemory(MemoryAllocator, StagingBufferCaches[1].Allocation, &Data);
     std::memcpy(Data, (void*)Assets::TestTriangleMesh.Color.data(), DataSize);
     vmaUnmapMemory(MemoryAllocator, StagingBufferCaches[1].Allocation);
+    Data = nullptr;
+    DataSize = StagingBufferCaches[2].BufferSize;
+    vmaMapMemory(MemoryAllocator, StagingBufferCaches[2].Allocation, &Data);
+    std::memcpy(Data, (void*)Assets::TestTriangleMesh.TexCoord.data(), DataSize);
+    vmaUnmapMemory(MemoryAllocator, StagingBufferCaches[2].Allocation);
 
     // 创建顶点缓冲区
     VertexBufferCaches = CreateBuffer(Assets::TestTriangleMesh, MemoryAllocator,
@@ -900,7 +958,7 @@ void FVulkanRenderer::CreateIndexBuffer()
 
 void FVulkanRenderer::CreateConstantBuffer()
 {
-    ConstantBufferCaches = CreateBufferPack(Assets::TestTriangleMeshUniformBufferObject, MemoryAllocator,
+    ConstantBufferCaches = CreateBufferPack(sizeof(Assets::TestTriangleMeshUniformBufferObject), MemoryAllocator,
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_ONLY, 0);
 }
 
@@ -925,13 +983,16 @@ void FVulkanRenderer::UpdateBuffer(const double Time)
 
 void FVulkanRenderer::CreateDescriptorPool()
 {
-    VkDescriptorPoolSize PoolSize = {};
-    PoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    PoolSize.descriptorCount = 1; // 假设只需要一个描述符
+    std::array<VkDescriptorPoolSize, 2> PoolSizes = {};
+    PoolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    PoolSizes[0].descriptorCount = 1; // 假设只需要一个描述符
+    PoolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    PoolSizes[1].descriptorCount = 1; // 假设只需要一个
+
     VkDescriptorPoolCreateInfo PoolCreateInfo = {};
     PoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    PoolCreateInfo.poolSizeCount = 1;
-    PoolCreateInfo.pPoolSizes = &PoolSize;
+    PoolCreateInfo.poolSizeCount = static_cast<uint32_t>(PoolSizes.size());
+    PoolCreateInfo.pPoolSizes = PoolSizes.data();
     PoolCreateInfo.maxSets = 1; // 假设只需要一个描述符
     if (vkCreateDescriptorPool(LogicalDevice, &PoolCreateInfo, nullptr, &DescriptorPool) != VK_SUCCESS)
     {
@@ -956,17 +1017,30 @@ void FVulkanRenderer::CreateDescriptorSet()
     BufferInfo.buffer = ConstantBufferCaches[0].Buffer;
     BufferInfo.offset = 0;
     BufferInfo.range = sizeof(Assets::TestTriangleMeshUniformBufferObject);
-    VkWriteDescriptorSet DescriptorWrite = {};
-    DescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    DescriptorWrite.dstSet = DescriptorSet;
-    DescriptorWrite.dstBinding = 0; // 假设绑定点为0
-    DescriptorWrite.dstArrayElement = 0;
-    DescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    DescriptorWrite.descriptorCount = 1; // 假设只写入一个描述符
-    DescriptorWrite.pBufferInfo = &BufferInfo;
-    DescriptorWrite.pImageInfo = nullptr; // 如果不使用图像描述符
-    DescriptorWrite.pTexelBufferView = nullptr; // 如果不使用纹理缓冲视图
-    vkUpdateDescriptorSets(LogicalDevice, 1, &DescriptorWrite, 0, nullptr);
+
+    VkDescriptorImageInfo ImageInfo = {};
+    ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    ImageInfo.imageView = TextureImageView;
+    ImageInfo.sampler = TextureSampler;
+
+    std::array<VkWriteDescriptorSet, 2> DescriptorWrites = {};
+    DescriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    DescriptorWrites[0].dstSet = DescriptorSet;
+    DescriptorWrites[0].dstBinding = 0;
+    DescriptorWrites[0].dstArrayElement = 0;
+    DescriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    DescriptorWrites[0].descriptorCount = 1;
+    DescriptorWrites[0].pBufferInfo = &BufferInfo;
+
+    DescriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    DescriptorWrites[1].dstSet = DescriptorSet;
+    DescriptorWrites[1].dstBinding = 1;
+    DescriptorWrites[1].dstArrayElement = 0;
+    DescriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    DescriptorWrites[1].descriptorCount = 1; 
+    DescriptorWrites[1].pImageInfo = &ImageInfo;
+
+    vkUpdateDescriptorSets(LogicalDevice, static_cast<uint32_t>(DescriptorWrites.size()), DescriptorWrites.data(), 0, nullptr);
 }
 
 void FVulkanRenderer::CreateCommandBuffers()
@@ -982,13 +1056,13 @@ void FVulkanRenderer::CreateCommandBuffers()
         spdlog::error("分配命令缓冲失败！");
         throw std::runtime_error("Failed to allocate command buffers!");
     }
-    for (size_t I = 0; I < CommandBuffers.size(); ++I)
+    for (size_t Idx = 0; Idx < CommandBuffers.size(); ++Idx)
     {
         VkCommandBufferBeginInfo BeginInfo = {};
         BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         BeginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT; // 可选标志
         BeginInfo.pInheritanceInfo = nullptr; // 可选继承信息
-        if (vkBeginCommandBuffer(CommandBuffers[I], &BeginInfo) != VK_SUCCESS)
+        if (vkBeginCommandBuffer(CommandBuffers[Idx], &BeginInfo) != VK_SUCCESS)
         {
             spdlog::error("开始录制命令缓冲失败！");
             throw std::runtime_error("Failed to begin recording command buffer!");
@@ -997,25 +1071,25 @@ void FVulkanRenderer::CreateCommandBuffers()
         VkRenderPassBeginInfo RenderPassInfo = {};
         RenderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
         RenderPassInfo.renderPass = RenderPass;
-        RenderPassInfo.framebuffer = SwapChainFramebuffers[I];
+        RenderPassInfo.framebuffer = SwapChainFramebuffers[Idx];
         RenderPassInfo.renderArea.offset = {.x = 0, .y = 0 };
         RenderPassInfo.renderArea.extent = SwapChainExtent;
         VkClearValue ClearColor = { {{0.0f, 0.0f, 0.0f, 1.0f}} }; // 清除颜色为黑色
         RenderPassInfo.clearValueCount = 1;
         RenderPassInfo.pClearValues = &ClearColor;
-        vkCmdBindPipeline(CommandBuffers[I], VK_PIPELINE_BIND_POINT_GRAPHICS, GraphicsPipeline);
+        vkCmdBindPipeline(CommandBuffers[Idx], VK_PIPELINE_BIND_POINT_GRAPHICS, GraphicsPipeline);
 
         // 绑定顶点缓冲区
         std::vector<VkBuffer> VertexBuffers(VertexBufferCaches.size());
         for (int I = 0; I < VertexBuffers.size(); ++I)VertexBuffers[I] = VertexBufferCaches[I].Buffer;
-        VkDeviceSize OffSets[] = {0, 0};
-        vkCmdBindVertexBuffers(CommandBuffers[I], 0, static_cast<uint32_t>(VertexBuffers.size()), VertexBuffers.data(), OffSets);
-        vkCmdBindIndexBuffer(CommandBuffers[I], IndexBufferCaches[0].Buffer, 0, VK_INDEX_TYPE_UINT16);
-        vkCmdBindDescriptorSets(CommandBuffers[I], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSet, 0, nullptr);
-        vkCmdBeginRenderPass(CommandBuffers[I], &RenderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-        vkCmdDrawIndexed(CommandBuffers[I], Assets::TestTriangleMeshIndices.Indices.size(), 1, 0, 0, 0); // 绘制一个三角形
-        vkCmdEndRenderPass(CommandBuffers[I]);
-        if (vkEndCommandBuffer(CommandBuffers[I]) != VK_SUCCESS)
+        VkDeviceSize OffSets[] = {0, 0, 0};
+        vkCmdBindVertexBuffers(CommandBuffers[Idx], 0, static_cast<uint32_t>(VertexBuffers.size()), VertexBuffers.data(), OffSets);
+        vkCmdBindIndexBuffer(CommandBuffers[Idx], IndexBufferCaches[0].Buffer, 0, VK_INDEX_TYPE_UINT16);
+        vkCmdBindDescriptorSets(CommandBuffers[Idx], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSet, 0, nullptr);
+        vkCmdBeginRenderPass(CommandBuffers[Idx], &RenderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+        vkCmdDrawIndexed(CommandBuffers[Idx], Assets::TestTriangleMeshIndices.Indices.size(), 1, 0, 0, 0); // 绘制一个三角形
+        vkCmdEndRenderPass(CommandBuffers[Idx]);
+        if (vkEndCommandBuffer(CommandBuffers[Idx]) != VK_SUCCESS)
         {
             spdlog::error("结束录制命令缓冲失败！");
             throw std::runtime_error("Failed to record command buffer!");
@@ -1051,7 +1125,6 @@ void FVulkanRenderer::RecreateSwapChain(int Width, int Height)
 
 void FVulkanRenderer::CleanupSwapChain()
 {
-
     vkFreeCommandBuffers(LogicalDevice, CommandPool, static_cast<uint32_t>(CommandBuffers.size()), CommandBuffers.data());
     for (auto Framebuffer : SwapChainFramebuffers)
     {
@@ -1101,10 +1174,18 @@ void FVulkanRenderer::CreateDescriptorSetLayout()
     CBufferLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
     CBufferLayoutBinding.pImmutableSamplers = nullptr; // 可选
 
+    VkDescriptorSetLayoutBinding SamplerLayoutBinding = {};
+    SamplerLayoutBinding.binding = 1;
+    SamplerLayoutBinding.descriptorCount = 1;
+    SamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    SamplerLayoutBinding.pImmutableSamplers = nullptr;
+    SamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    std::array Bindings = { CBufferLayoutBinding, SamplerLayoutBinding };
     VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = {};
     LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    LayoutCreateInfo.bindingCount = 1;
-    LayoutCreateInfo.pBindings = &CBufferLayoutBinding;
+    LayoutCreateInfo.bindingCount = static_cast<uint32_t>(Bindings.size());
+    LayoutCreateInfo.pBindings = Bindings.data();
 
     if (vkCreateDescriptorSetLayout(LogicalDevice, &LayoutCreateInfo, nullptr, &DescriptorSetLayout) != VK_SUCCESS) 
     {
@@ -1231,11 +1312,8 @@ void FVulkanRenderer::CreateMemoryAllocator()
     }
 }
 
-void FVulkanRenderer::CopyBuffer(std::vector<VkBufferCache> SrcBuffer, std::vector<VkBufferCache> DstBuffer)
+VkCommandBuffer FVulkanRenderer::BeginSingleTimeCommands() const
 {
-    assert(SrcBuffer.size() == DstBuffer.size());
-
-    // 创建一个临时命令缓冲区来执行复制操作
     VkCommandBufferAllocateInfo AllocInfo = {};
     AllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     AllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
@@ -1250,26 +1328,127 @@ void FVulkanRenderer::CopyBuffer(std::vector<VkBufferCache> SrcBuffer, std::vect
     BeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     vkBeginCommandBuffer(CommandBuffer, &BeginInfo);
 
-    for (int Idx = 0; Idx < SrcBuffer.size(); ++Idx)
+    return CommandBuffer;
+}
+
+void FVulkanRenderer::EndSingleTimeCommands(const VkCommandBuffer CommandBuffer) const
+{
+    vkEndCommandBuffer(CommandBuffer);
+
+    // 提交并等待复制完成
+    VkSubmitInfo SubmitInfo = {};
+    SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    SubmitInfo.commandBufferCount = 1;
+    SubmitInfo.pCommandBuffers = &CommandBuffer;
+    vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
+    vkQueueWaitIdle(GraphicsQueue);
+
+    // 清理临时资源
+    vkFreeCommandBuffers(LogicalDevice, CommandPool, 1, &CommandBuffer);
+}
+
+void FVulkanRenderer::CopyBuffer(const std::vector<VkBufferCache>& SrcBuffer, const std::vector<VkBufferCache>& DstBuffer)
+{
+    assert(SrcBuffer.size() == DstBuffer.size());
+
+    // 创建一个临时命令缓冲区来执行复制操作
+    VkCommandBuffer CommandBuffer = BeginSingleTimeCommands();
+    for (size_t Idx = 0; Idx < SrcBuffer.size(); ++Idx)
     {
-        VkBufferCache& SrcBufferCache = SrcBuffer[Idx];
-        VkBufferCache& DstBufferCache = DstBuffer[Idx];
+        const VkBufferCache& SrcBufferCache = SrcBuffer[Idx];
+        const VkBufferCache& DstBufferCache = DstBuffer[Idx];
         VkBufferCopy CopyRegion = {};
         CopyRegion.srcOffset = 0;
         CopyRegion.dstOffset = 0;
         CopyRegion.size = SrcBufferCache.BufferSize;
         vkCmdCopyBuffer(CommandBuffer, SrcBufferCache.Buffer, DstBufferCache.Buffer, 1, &CopyRegion);
     }
-    vkEndCommandBuffer(CommandBuffer);
+    EndSingleTimeCommands(CommandBuffer);
+}
 
-    // 提交并等待复制完成
-    VkSubmitInfo submitInfo = {};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &CommandBuffer;
-    vkQueueSubmit(GraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(GraphicsQueue);
+void FVulkanRenderer::CopyBufferToImage(const VkBufferCache& Buffer, const VkImageCache& Image) const
+{
+    const VkCommandBuffer CommandBuffer = BeginSingleTimeCommands();
+    VkBufferImageCopy Region = {};
+    Region.bufferOffset = 0;
+    Region.bufferRowLength = 0; // 0表示紧密打包
+    Region.bufferImageHeight = 0; // 0表示紧密打包
+    Region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    Region.imageSubresource.mipLevel = 0;
+    Region.imageSubresource.baseArrayLayer = 0;
+    Region.imageSubresource.layerCount = 1;
+    Region.imageOffset = {.x = 0, .y = 0, .z = 0};
+    Region.imageExtent = {.width = Image.Width, .height = Image.Height, .depth = 1 };
+    vkCmdCopyBufferToImage(CommandBuffer, Buffer.Buffer, Image.Image,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &Region);
+    EndSingleTimeCommands(CommandBuffer);
+}
 
-    // 清理临时资源
-    vkFreeCommandBuffers(LogicalDevice, CommandPool, 1, &CommandBuffer);
+void FVulkanRenderer::TransitionImageLayout(VkImage Image, VkFormat Format, VkImageLayout OldLayout, VkImageLayout NewLayout) const
+{
+    VkCommandBuffer CommandBuffer = BeginSingleTimeCommands();
+
+    VkPipelineStageFlags SourceStage;
+    VkPipelineStageFlags DestinationStage;
+
+    VkImageMemoryBarrier Barrier = {};
+    Barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    Barrier.oldLayout = OldLayout;
+    Barrier.newLayout = NewLayout;
+    Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED; // VK_QUEUE_FAMILY_IGNORED不是默认值，需要显式指定
+    Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    Barrier.image = Image;
+    Barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    Barrier.subresourceRange.baseMipLevel = 0;
+    Barrier.subresourceRange.levelCount = 1;
+    Barrier.subresourceRange.baseArrayLayer = 0;
+    Barrier.subresourceRange.layerCount = 1;
+
+    if (OldLayout == VK_IMAGE_LAYOUT_UNDEFINED && NewLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) 
+    {
+        Barrier.srcAccessMask = 0;
+        Barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+        SourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        DestinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    }
+    else if (OldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && NewLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+    {
+        Barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        Barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+        SourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        DestinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    }
+    else 
+    {
+        spdlog::error("不支持的图像布局转换！");
+        throw std::invalid_argument("unsupported layout transition!");
+    }
+
+    vkCmdPipelineBarrier(CommandBuffer, SourceStage, DestinationStage, 0, 0, nullptr, 0, nullptr, 1, &Barrier);
+
+    EndSingleTimeCommands(CommandBuffer);
+}
+
+VkImageView FVulkanRenderer::CreateImageView(VkImage Image, VkFormat Format) const
+{
+    VkImageViewCreateInfo ViewInfo = {};
+    ViewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    ViewInfo.image = Image;
+    ViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    ViewInfo.format = Format;
+    ViewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    ViewInfo.subresourceRange.baseMipLevel = 0;
+    ViewInfo.subresourceRange.levelCount = 1;
+    ViewInfo.subresourceRange.baseArrayLayer = 0;
+    ViewInfo.subresourceRange.layerCount = 1;
+
+    VkImageView ImageView;
+    if (vkCreateImageView(LogicalDevice, &ViewInfo, nullptr, &ImageView) != VK_SUCCESS) 
+    {
+        spdlog::error("创建纹理图像视图失败！");
+    }
+
+    return ImageView;
 }

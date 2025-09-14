@@ -16,3 +16,6 @@ target_link_libraries(InternalLib PUBLIC yalantinglibs::yalantinglibs)
 target_include_directories(InternalLib PUBLIC ${SPDLOG_INCLUDE_DIR})
 target_link_directories(InternalLib PUBLIC ${SPDLOG_LIBRARY_DIR})
 target_link_libraries(InternalLib PUBLIC  debug spdlogd optimized spdlog)
+
+# stb
+target_include_directories(InternalLib PRIVATE ${STB_INCLUDE_DIR}) # 不需要暴露给外部

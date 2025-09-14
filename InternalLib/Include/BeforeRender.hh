@@ -1,8 +1,7 @@
 #pragma once
 
-#include "InternalLibMarco.hh"
-
 #include "CallbackSystem.hh"
+#include "InternalLibMarco.hh"
 #include "Mixins.hh"
 
 namespace SilverBell
@@ -16,7 +15,7 @@ namespace SilverBell
         double WorldTime = 0.0;
     };
 
-    class INTERNALLIB_API BeforeRenderEvent : public TMP::GenericCallbackSystem<std::variant<TimeInfo*>>,
+    class INTERNALLIB_API BeforeRenderEvent : public TMP::GenericCallbackSystem<std::variant<TimeInfo*>>,  // NOLINT(cppcoreguidelines-special-member-functions)
                                               public NonCopyable, public NonMovable
     {
     public:

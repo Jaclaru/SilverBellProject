@@ -100,6 +100,9 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(yalantinglibs)
 
+# stb
+set(STB_INCLUDE_DIR "${THIRD_PARTY_DIR}/stb/Include" CACHE INTERNAL "stb Include")
+
 ########################## 子目录 ##########################
 add_subdirectory(Application)
 add_subdirectory(Renderer)

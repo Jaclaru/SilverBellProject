@@ -68,6 +68,12 @@ namespace SilverBell::Renderer
 
         void CreateCommandPool();
 
+        void CreateTextureImage();
+
+        void CreateTextureImageView();
+
+        void CreateTextureSampler();
+
         void CreateVertexBuffers();
 
         void CreateIndexBuffer();
@@ -102,11 +108,20 @@ namespace SilverBell::Renderer
 
         void CreateMemoryAllocator();
 
-        void CopyBuffer(std::vector<VkBufferCache> SrcBuffer, std::vector<VkBufferCache> DstBuffer);
-        void CopyBuffer(VkBufferCache SrcBuffer, VkBufferCache DstBuffer)
+        VkCommandBuffer BeginSingleTimeCommands() const;
+
+        void EndSingleTimeCommands(VkCommandBuffer CommandBuffer) const;
+
+        void CopyBuffer(const std::vector<VkBufferCache>& SrcBuffer, const std::vector<VkBufferCache>& DstBuffer);
+        void CopyBuffer(const VkBufferCache& SrcBuffer, const VkBufferCache& DstBuffer)
         {
             CopyBuffer(std::vector{ SrcBuffer }, std::vector{ DstBuffer });
         }
+        void CopyBufferToImage(const VkBufferCache& Buffer, const VkImageCache& Image) const;
+
+        void TransitionImageLayout(VkImage Image, VkFormat Format, VkImageLayout OldLayout, VkImageLayout NewLayout) const;
+
+        VkImageView CreateImageView(VkImage Image, VkFormat Format) const;
 
         // Vulkan实例扩展
         std::vector<const char*> InstanceExtensions;
@@ -166,6 +181,12 @@ namespace SilverBell::Renderer
         std::vector<VkBufferCache> IndexBufferCaches;
         // 常量缓冲区
         std::vector<VkBufferCache> ConstantBufferCaches;
+        // 纹理图像
+        VkImageCache TextureImageCache;
+        // 纹理图像视图
+        VkImageView TextureImageView;
+        // 纹理采样器
+        VkSampler TextureSampler;
 
         // VMA内存分配
         VmaAllocator MemoryAllocator;

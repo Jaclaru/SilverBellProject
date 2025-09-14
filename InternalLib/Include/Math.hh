@@ -33,15 +33,15 @@ namespace SilverBell::Math
 
     constexpr double PI = 3.14159265358979323846;
 
-    __FORCEINLINE float ToRadians(float Angle)  { return Angle * PI / 180.0f; }
-    __FORCEINLINE Vec2  ToRadians(Vec2  Angle)  { return Angle * PI / 180.0f; }
-    __FORCEINLINE Vec3  ToRadians(Vec3  Angle)  { return Angle * PI / 180.0f; }
-    __FORCEINLINE Vec4  ToRadians(Vec4  Angle)  { return Angle * PI / 180.0f; }
+    __FORCEINLINE float ToRadians(const float Angle)  { return Angle * PI / 180.0f; }
+    __FORCEINLINE Vec2  ToRadians(const Vec2& Angle)  { return Angle * PI / 180.0f; }
+    __FORCEINLINE Vec3  ToRadians(const Vec3& Angle)  { return Angle * PI / 180.0f; }
+    __FORCEINLINE Vec4  ToRadians(const Vec4& Angle)  { return Angle * PI / 180.0f; }
 
-    __FORCEINLINE float ToAngle(float radians)  { return radians * 180.0f / PI; }
-    __FORCEINLINE Vec2  ToAngle(Vec2  radians)  { return radians * 180.0f / PI; }
-    __FORCEINLINE Vec3  ToAngle(Vec3  radians)  { return radians * 180.0f / PI; }
-    __FORCEINLINE Vec4  ToAngle(Vec4  radians)  { return radians * 180.0f / PI; }
+    __FORCEINLINE float ToAngle(const float  Radians) { return Radians * 180.0f / PI; }
+    __FORCEINLINE Vec2  ToAngle(const Vec2&  Radians) { return Radians * 180.0f / PI; }
+    __FORCEINLINE Vec3  ToAngle(const Vec3&  Radians) { return Radians * 180.0f / PI; }
+    __FORCEINLINE Vec4  ToAngle(const Vec4&  Radians) { return Radians * 180.0f / PI; }
 
     __FORCEINLINE uint32_t Align(uint32_t value, uint32_t alignment)
     {
@@ -132,13 +132,13 @@ namespace SilverBell::Math
 
     Vec3 ClampEulerAngle(Vec3 Angle);
 
-    INTERNALLIB_API Vec3 ToEulerAngle(const Quaternion& q);
+    INTERNALLIB_API Vec3 ToEulerAngle(const Quaternion& Quad);
 
-    INTERNALLIB_API Quaternion ToQuaternion(Vec3 eulerAngle);
+    INTERNALLIB_API Quaternion ToQuaternion(const Vec3& EulerAngle);
 
-    INTERNALLIB_API Mat4 LookAt(Vec3 eye, Vec3 center, Vec3 up);
+    INTERNALLIB_API Mat4 LookAt(const Vec3& Eye, const Vec3& Center, const Vec3& Up);
 
-    INTERNALLIB_API Mat4 Perspective(float fovy, float aspect, float near, float far);
+    INTERNALLIB_API Mat4 Perspective(float Fov, float Aspect, float Near, float Far);
 
     Mat4 Ortho(float left, float right, float bottom, float top, float near, float far);
 

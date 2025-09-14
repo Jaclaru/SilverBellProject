@@ -1,7 +1,9 @@
 #include "BeforeRender.hh"
 
-SilverBell::BeforeRenderEvent& SilverBell::BeforeRenderEvent::Instance()
+using namespace SilverBell;
+
+BeforeRenderEvent& BeforeRenderEvent::Instance()
 {
-    static BeforeRenderEvent Instance;
-    return Instance;
+    static BeforeRenderEvent sInstance;
+    return sInstance;
 }

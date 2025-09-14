@@ -114,6 +114,8 @@ namespace SilverBell::Renderer
         VmaAllocationInfo AllocationInfo = {};
     };
 
+
+
     // 创建缓冲区，返回每个成员对应的缓冲区数组
     template<typename T, std::size_t I = ylt::reflection::members_count_v<T>>
     [[nodiscard]] std::vector<VkBufferCache> CreateBuffer(const T& iDataSource,
@@ -170,16 +172,13 @@ namespace SilverBell::Renderer
         return BufferCaches;
     }
 
-    // 偏特化版本：当数据源没有成员时使用，尚未实现
-    template<typename T>
-    [[nodiscard]] std::vector<VkBufferCache> CreateBufferPack(const T& iDataSource,
+    [[nodiscard]] __FORCEINLINE std::vector<VkBufferCache> CreateBufferPack(size_t ValueSize,
         VmaAllocator MemoryAllocator,
         VkBufferUsageFlagBits VkBufferUsageFlagBits,
         VmaMemoryUsage VmaUsageBits,
         VmaAllocationCreateFlags VmaCreateFlagsBits)
     {
         std::vector<VkBufferCache> BufferCaches(1);
-        size_t ValueSize = sizeof(T);
 
         VkBufferCreateInfo BufferInfo = {};
         BufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -205,6 +204,67 @@ namespace SilverBell::Renderer
             throw std::runtime_error("Failed to create buffer!");
         }
         return BufferCaches;
+    }
+
+
+    struct VMAImgCreateInfo
+    {
+        int Width = 0;
+        int Height = 0;
+        VkFormat Format = VK_FORMAT_R8G8B8A8_UNORM;
+        VkImageUsageFlags Usage = 0;
+        VmaMemoryUsage MemoryUsage = VMA_MEMORY_USAGE_GPU_ONLY;
+        VmaAllocationCreateFlags AllocationCreateFlags = 0;
+    };
+
+    struct VkImageCache
+    {
+        uint32_t Width = 0;
+        uint32_t Height = 0;
+        VkImage Image = VK_NULL_HANDLE;
+        VmaAllocation Allocation = VK_NULL_HANDLE;
+        VmaAllocationInfo AllocationInfo = {};
+    };
+
+    [[nodiscard]] __FORCEINLINE VkImageCache CreateImage(VmaAllocator MemoryAllocator, const VMAImgCreateInfo& CreateInfo)
+    {
+        VkImageCache ImageCache;
+
+        VkImageCreateInfo ImageInfo = {};
+        ImageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        ImageInfo.imageType = VK_IMAGE_TYPE_2D;
+        ImageInfo.extent.width = static_cast<uint32_t>(CreateInfo.Width);
+        ImageInfo.extent.height = static_cast<uint32_t>(CreateInfo.Height);
+        ImageInfo.extent.depth = 1;
+        ImageInfo.mipLevels = 1;
+        ImageInfo.arrayLayers = 1;
+        ImageInfo.format = CreateInfo.Format;
+        ImageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+        ImageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        ImageInfo.usage = CreateInfo.Usage;
+        ImageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        ImageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+        ImageInfo.flags = 0;
+
+        VmaAllocationCreateInfo AllocCreateInfo = {};
+        AllocCreateInfo.usage = CreateInfo.MemoryUsage;
+        AllocCreateInfo.flags = CreateInfo.AllocationCreateFlags;
+
+
+        ImageCache.Width = static_cast<uint32_t>(CreateInfo.Width);
+        ImageCache.Height = static_cast<uint32_t>(CreateInfo.Height);
+        if (vmaCreateImage(MemoryAllocator,
+            &ImageInfo,
+            &AllocCreateInfo,
+            &ImageCache.Image,
+            &ImageCache.Allocation,
+            &ImageCache.AllocationInfo) != VK_SUCCESS)
+        {
+            spdlog::error("创建图片失败！");
+            throw std::runtime_error("Failed to create Image!");
+        }
+
+        return ImageCache;
     }
 
 
