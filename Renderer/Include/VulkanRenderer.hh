@@ -119,12 +119,12 @@ namespace SilverBell::Renderer
 
         void EndSingleTimeCommands(VkCommandBuffer CommandBuffer) const;
 
-        void CopyBuffer(const std::vector<VkBufferCache>& SrcBuffer, const std::vector<VkBufferCache>& DstBuffer);
-        void CopyBuffer(const VkBufferCache& SrcBuffer, const VkBufferCache& DstBuffer)
+        void CopyBuffer(const std::vector<VMABufferCache>& SrcBuffer, const std::vector<VMABufferCache>& DstBuffer);
+        void CopyBuffer(const VMABufferCache& SrcBuffer, const VMABufferCache& DstBuffer)
         {
             CopyBuffer(std::vector{ SrcBuffer }, std::vector{ DstBuffer });
         }
-        void CopyBufferToImage(const VkBufferCache& Buffer, const VkImageCache& Image) const;
+        void CopyBufferToImage(const VMABufferCache& Buffer, const VMAImageCache& Image) const;
 
         void TransitionImageLayout(VkImage Image, VkFormat Format, VkImageLayout OldLayout, VkImageLayout NewLayout) const;
 
@@ -197,21 +197,21 @@ namespace SilverBell::Renderer
         VkSemaphore ImageAvailableSemaphore;
         VkSemaphore RenderFinishedSemaphore;
         // 顶点临时缓冲
-        std::vector<VkBufferCache> StagingBufferCaches;
+        std::vector<VMABufferCache> StagingBufferCaches;
         // 顶点缓冲
-        std::vector<VkBufferCache> VertexBufferCaches;
+        std::vector<VMABufferCache> VertexBufferCaches;
         // 顶点索引缓冲
-        std::vector<VkBufferCache> IndexBufferCaches;
+        std::vector<VMABufferCache> IndexBufferCaches;
         // 常量缓冲区
-        std::vector<VkBufferCache> ConstantBufferCaches;
+        std::vector<VMABufferCache> ConstantBufferCaches;
         // 纹理图像
-        VkImageCache TextureImageCache;
+        VMAImageCache TextureImageCache;
         // 纹理图像视图
         VkImageView TextureImageView;
         // 纹理采样器
         VkSampler TextureSampler;
         // 深度图像
-        VkImageCache DepthImageCache;
+        VMAImageCache DepthImageCache;
         // 深度图像视图
         VkImageView DepthImageView;
 

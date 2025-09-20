@@ -106,10 +106,10 @@ namespace SilverBell::Renderer
         return GetBindingDescriptions(T{});
     }
 
-    struct VkBufferCache
+    struct VMABufferCache
     {
         VkDeviceSize BufferSize = 0;
-        VkBuffer Buffer = VK_NULL_HANDLE;
+        VkBuffer BufferHandle = VK_NULL_HANDLE;
         VmaAllocation Allocation = VK_NULL_HANDLE;
         VmaAllocationInfo AllocationInfo = {};
     };
@@ -118,13 +118,13 @@ namespace SilverBell::Renderer
 
     // 创建缓冲区，返回每个成员对应的缓冲区数组
     template<typename T, std::size_t I = ylt::reflection::members_count_v<T>>
-    [[nodiscard]] std::vector<VkBufferCache> CreateBuffer(const T& iDataSource,
+    [[nodiscard]] std::vector<VMABufferCache> CreateBuffer(const T& iDataSource,
                                                          VmaAllocator MemoryAllocator,   
                                                          VkBufferUsageFlagBits VkBufferUsageFlagBits,
                                                          VmaMemoryUsage VmaUsageBits, 
                                                          VmaAllocationCreateFlags VmaCreateFlagsBits)
     {
-        std::vector<VkBufferCache> BufferCaches;
+        std::vector<VMABufferCache> BufferCaches;
         BufferCaches.resize(I);
 
         ylt::reflection::for_each(iDataSource, 
@@ -154,12 +154,12 @@ namespace SilverBell::Renderer
                 AllocCreateInfo.usage = VmaUsageBits;
                 AllocCreateInfo.flags = VmaCreateFlagsBits;
 
-                VkBufferCache& BufferCache = BufferCaches[Index];
+                VMABufferCache& BufferCache = BufferCaches[Index];
                 BufferCache.BufferSize = ValueSize;
                 if (vmaCreateBuffer(MemoryAllocator,
                     &BufferInfo,
                     &AllocCreateInfo,
-                    &BufferCache.Buffer,
+                    &BufferCache.BufferHandle,
                     &BufferCache.Allocation,
                     &BufferCache.AllocationInfo) != VK_SUCCESS)
                 {
@@ -172,13 +172,13 @@ namespace SilverBell::Renderer
         return BufferCaches;
     }
 
-    [[nodiscard]] __FORCEINLINE std::vector<VkBufferCache> CreateBufferPack(size_t ValueSize,
+    [[nodiscard]] __FORCEINLINE std::vector<VMABufferCache> CreateBufferPack(size_t ValueSize,
         VmaAllocator MemoryAllocator,
         VkBufferUsageFlagBits VkBufferUsageFlagBits,
         VmaMemoryUsage VmaUsageBits,
         VmaAllocationCreateFlags VmaCreateFlagsBits)
     {
-        std::vector<VkBufferCache> BufferCaches(1);
+        std::vector<VMABufferCache> BufferCaches(1);
 
         VkBufferCreateInfo BufferInfo = {};
         BufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -191,12 +191,12 @@ namespace SilverBell::Renderer
         AllocCreateInfo.usage = VmaUsageBits;
         AllocCreateInfo.flags = VmaCreateFlagsBits;
 
-        VkBufferCache& BufferCache = BufferCaches[0];
+        VMABufferCache& BufferCache = BufferCaches[0];
         BufferCache.BufferSize = ValueSize;
         if (vmaCreateBuffer(MemoryAllocator,
             &BufferInfo,
             &AllocCreateInfo,
-            &BufferCache.Buffer,
+            &BufferCache.BufferHandle,
             &BufferCache.Allocation,
             &BufferCache.AllocationInfo) != VK_SUCCESS)
         {
@@ -218,18 +218,18 @@ namespace SilverBell::Renderer
         VmaAllocationCreateFlags AllocationCreateFlags = 0;
     };
 
-    struct VkImageCache
+    struct VMAImageCache
     {
         uint32_t Width = 0;
         uint32_t Height = 0;
-        VkImage Image = VK_NULL_HANDLE;
+        VkImage ImageHandle = VK_NULL_HANDLE;
         VmaAllocation Allocation = VK_NULL_HANDLE;
         VmaAllocationInfo AllocationInfo = {};
     };
 
-    [[nodiscard]] __FORCEINLINE VkImageCache CreateImage(VmaAllocator MemoryAllocator, const VMAImgCreateInfo& CreateInfo)
+    [[nodiscard]] __FORCEINLINE VMAImageCache CreateImage(VmaAllocator MemoryAllocator, const VMAImgCreateInfo& CreateInfo)
     {
-        VkImageCache ImageCache;
+        VMAImageCache ImageCache;
 
         VkImageCreateInfo ImageInfo = {};
         ImageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -257,7 +257,7 @@ namespace SilverBell::Renderer
         if (vmaCreateImage(MemoryAllocator,
             &ImageInfo,
             &AllocCreateInfo,
-            &ImageCache.Image,
+            &ImageCache.ImageHandle,
             &ImageCache.Allocation,
             &ImageCache.AllocationInfo) != VK_SUCCESS)
         {

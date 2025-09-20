@@ -194,20 +194,20 @@ void FVulkanRenderer::CleanUp()
     // 销毁顶点缓冲区
     for (auto& BufferCache : VertexBufferCaches)
     {
-        vmaDestroyBuffer(MemoryAllocator, BufferCache.Buffer, BufferCache.Allocation);
+        vmaDestroyBuffer(MemoryAllocator, BufferCache.BufferHandle, BufferCache.Allocation);
     }
     // 销毁索引缓冲区
     for (auto& BufferCache : IndexBufferCaches)
     {
-        vmaDestroyBuffer(MemoryAllocator, BufferCache.Buffer, BufferCache.Allocation);
+        vmaDestroyBuffer(MemoryAllocator, BufferCache.BufferHandle, BufferCache.Allocation);
     }
     // 销毁常量缓冲区
     for (auto& BufferCache : ConstantBufferCaches)
     {
-        vmaDestroyBuffer(MemoryAllocator, BufferCache.Buffer, BufferCache.Allocation);
+        vmaDestroyBuffer(MemoryAllocator, BufferCache.BufferHandle, BufferCache.Allocation);
     }
     // 销毁纹理
-    vmaDestroyImage(MemoryAllocator, TextureImageCache.Image, TextureImageCache.Allocation);
+    vmaDestroyImage(MemoryAllocator, TextureImageCache.ImageHandle, TextureImageCache.Allocation);
     vkDestroySampler(LogicalDevice, TextureSampler, nullptr);
     vkDestroyImageView(LogicalDevice, TextureImageView, nullptr);
 
@@ -872,8 +872,8 @@ void FVulkanRenderer::CreateDepthResources()
     CreateInfo.MemoryUsage = VMA_MEMORY_USAGE_GPU_ONLY;
     CreateInfo.AllocationCreateFlags = 0;
     DepthImageCache = CreateImage(MemoryAllocator, CreateInfo);
-    DepthImageView = CreateImageView(DepthImageCache.Image, DepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
-    TransitionImageLayout(DepthImageCache.Image, DepthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+    DepthImageView = CreateImageView(DepthImageCache.ImageHandle, DepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+    TransitionImageLayout(DepthImageCache.ImageHandle, DepthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 }
 
 void FVulkanRenderer::CreateTextureImage()
@@ -901,19 +901,19 @@ void FVulkanRenderer::CreateTextureImage()
         CreateInfo.AllocationCreateFlags = 0;
 
         TextureImageCache = CreateImage(MemoryAllocator, CreateInfo);
-        TransitionImageLayout(TextureImageCache.Image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        TransitionImageLayout(TextureImageCache.ImageHandle, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
         CopyBufferToImage(BufferCache[0], TextureImageCache);
         // 为了了在着色器中读取纹理，我们需要将图像布局转换为着色器读取专用
-        TransitionImageLayout(TextureImageCache.Image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        TransitionImageLayout(TextureImageCache.ImageHandle, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
         // 清理临时缓冲区
-        vmaDestroyBuffer(MemoryAllocator, BufferCache[0].Buffer, BufferCache[0].Allocation);
+        vmaDestroyBuffer(MemoryAllocator, BufferCache[0].BufferHandle, BufferCache[0].Allocation);
     }
 }
 
 void FVulkanRenderer::CreateTextureImageView()
 {
-    TextureImageView = CreateImageView(TextureImageCache.Image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+    TextureImageView = CreateImageView(TextureImageCache.ImageHandle, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
 }
 
 void FVulkanRenderer::CreateTextureSampler()
@@ -980,7 +980,7 @@ void FVulkanRenderer::CreateVertexBuffers()
     // 销毁临时缓冲区
     for (const auto& BufferCache : StagingBufferCaches)
     {
-        vmaDestroyBuffer(MemoryAllocator, BufferCache.Buffer, BufferCache.Allocation);
+        vmaDestroyBuffer(MemoryAllocator, BufferCache.BufferHandle, BufferCache.Allocation);
     }
 }
 
@@ -1066,7 +1066,7 @@ void FVulkanRenderer::CreateDescriptorSet()
         throw std::runtime_error("Failed to allocate descriptor set!");
     }
     VkDescriptorBufferInfo BufferInfo = {};
-    BufferInfo.buffer = ConstantBufferCaches[0].Buffer;
+    BufferInfo.buffer = ConstantBufferCaches[0].BufferHandle;
     BufferInfo.offset = 0;
     BufferInfo.range = sizeof(Assets::TestTriangleMeshUniformBufferObject);
 
@@ -1136,7 +1136,7 @@ void FVulkanRenderer::CreateCommandBuffers()
 
         // 绑定顶点缓冲区
         std::vector<VkBuffer> VertexBuffers(VertexBufferCaches.size());
-        for (int I = 0; I < VertexBuffers.size(); ++I)VertexBuffers[I] = VertexBufferCaches[I].Buffer;
+        for (int I = 0; I < VertexBuffers.size(); ++I)VertexBuffers[I] = VertexBufferCaches[I].BufferHandle;
         VkDeviceSize OffSets[] = {0, 0, 0};
         vkCmdBindVertexBuffers(CommandBuffers[Idx], 0, static_cast<uint32_t>(VertexBuffers.size()), VertexBuffers.data(), OffSets);
         //vkCmdBindIndexBuffer(CommandBuffers[Idx], IndexBufferCaches[0].Buffer, 0, VK_INDEX_TYPE_UINT32);
@@ -1182,7 +1182,7 @@ void FVulkanRenderer::RecreateSwapChain(int Width, int Height)
 void FVulkanRenderer::CleanupSwapChain()
 {
     vkDestroyImageView(LogicalDevice, DepthImageView, nullptr);
-    vmaDestroyImage(MemoryAllocator, DepthImageCache.Image, DepthImageCache.Allocation);
+    vmaDestroyImage(MemoryAllocator, DepthImageCache.ImageHandle, DepthImageCache.Allocation);
 
     vkFreeCommandBuffers(LogicalDevice, CommandPool, static_cast<uint32_t>(CommandBuffers.size()), CommandBuffers.data());
     for (auto Framebuffer : SwapChainFramebuffers)
@@ -1408,7 +1408,7 @@ void FVulkanRenderer::EndSingleTimeCommands(const VkCommandBuffer CommandBuffer)
     vkFreeCommandBuffers(LogicalDevice, CommandPool, 1, &CommandBuffer);
 }
 
-void FVulkanRenderer::CopyBuffer(const std::vector<VkBufferCache>& SrcBuffer, const std::vector<VkBufferCache>& DstBuffer)
+void FVulkanRenderer::CopyBuffer(const std::vector<VMABufferCache>& SrcBuffer, const std::vector<VMABufferCache>& DstBuffer)
 {
     assert(SrcBuffer.size() == DstBuffer.size());
 
@@ -1416,18 +1416,18 @@ void FVulkanRenderer::CopyBuffer(const std::vector<VkBufferCache>& SrcBuffer, co
     VkCommandBuffer CommandBuffer = BeginSingleTimeCommands();
     for (size_t Idx = 0; Idx < SrcBuffer.size(); ++Idx)
     {
-        const VkBufferCache& SrcBufferCache = SrcBuffer[Idx];
-        const VkBufferCache& DstBufferCache = DstBuffer[Idx];
+        const VMABufferCache& SrcBufferCache = SrcBuffer[Idx];
+        const VMABufferCache& DstBufferCache = DstBuffer[Idx];
         VkBufferCopy CopyRegion = {};
         CopyRegion.srcOffset = 0;
         CopyRegion.dstOffset = 0;
         CopyRegion.size = SrcBufferCache.BufferSize;
-        vkCmdCopyBuffer(CommandBuffer, SrcBufferCache.Buffer, DstBufferCache.Buffer, 1, &CopyRegion);
+        vkCmdCopyBuffer(CommandBuffer, SrcBufferCache.BufferHandle, DstBufferCache.BufferHandle, 1, &CopyRegion);
     }
     EndSingleTimeCommands(CommandBuffer);
 }
 
-void FVulkanRenderer::CopyBufferToImage(const VkBufferCache& Buffer, const VkImageCache& Image) const
+void FVulkanRenderer::CopyBufferToImage(const VMABufferCache& Buffer, const VMAImageCache& Image) const
 {
     const VkCommandBuffer CommandBuffer = BeginSingleTimeCommands();
     VkBufferImageCopy Region = {};
@@ -1440,7 +1440,7 @@ void FVulkanRenderer::CopyBufferToImage(const VkBufferCache& Buffer, const VkIma
     Region.imageSubresource.layerCount = 1;
     Region.imageOffset = {.x = 0, .y = 0, .z = 0};
     Region.imageExtent = {.width = Image.Width, .height = Image.Height, .depth = 1 };
-    vkCmdCopyBufferToImage(CommandBuffer, Buffer.Buffer, Image.Image,
+    vkCmdCopyBufferToImage(CommandBuffer, Buffer.BufferHandle, Image.ImageHandle,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &Region);
     EndSingleTimeCommands(CommandBuffer);
 }

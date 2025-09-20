@@ -2,6 +2,9 @@
 
 #include "CallbackSystem.hh"
 
+#include "DirectedGraph.hh"
+#include "DirectedGraphTraversal.hh"
+
 using namespace SilverBell::TMP;
 
 
