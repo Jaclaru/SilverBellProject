@@ -1,7 +1,6 @@
 #pragma once
 
-#include "InternalLibMarco.hh"
-#include <spdlog/logger.h>
+#include <spdlog/spdlog.h>
 
 #include <unordered_map>
 #include <unordered_set>
@@ -13,7 +12,7 @@ namespace SilverBell::Algorithm
      * 简易实现一个有向图
      * 参考自 Nvidia Falcor https://github.com/NVIDIAGameWorks/Falcor
      */
-    class INTERNALLIB_API DirectedGraph
+    class DirectedGraph
     {
     public:
         static constexpr uint32_t InvalidID = static_cast<uint32_t>(-1);
@@ -40,8 +39,8 @@ namespace SilverBell::Algorithm
             // 找到该节点的入向边的源节点，并获取该源节点需要删除的出向边存入RemovedEdges
             for (auto& EdgeId : NodeMap[NodeID].IncomingEdges)
                 FindEdgesToRemove<false>(NodeMap[EdgeMap[EdgeId].SrcNodeID].OutgoingEdges, NodeID, RemovedEdges);
+            // 找到该节点的出向边的目标节点，并获取该目标节点需要删除的入向边存入RemovedEdges
             for (auto& EdgeId : NodeMap[NodeID].OutgoingEdges)
-                // 找到该节点的出向边的目标节点，并获取该目标节点需要删除的入向边存入RemovedEdges
                 FindEdgesToRemove<true>(NodeMap[EdgeMap[EdgeId].DstNodeID].IncomingEdges, NodeID, RemovedEdges);
 
             // 删除所有相关的边

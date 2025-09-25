@@ -10,8 +10,7 @@
 namespace SilverBell::Math
 {
 
-    // 注意:    Eigen的矩阵是行优先 row
-    //          glm的矩阵是列优先 column
+    // 注意: Eigen的矩阵默认列主序的，但给其赋值时是数学中的行优先方式
 
     typedef Eigen::Matrix2f Mat2;
     typedef Eigen::Matrix3f Mat3;
@@ -137,6 +136,8 @@ namespace SilverBell::Math
     INTERNALLIB_API Quaternion ToQuaternion(const Vec3& EulerAngle);
 
     INTERNALLIB_API Mat4 LookAt(const Vec3& Eye, const Vec3& Center, const Vec3& Up);
+
+    // 注意：由于Vulkan的NDC空间Z轴是0到1，所以这里的投影矩阵需要做相应调整
 
     INTERNALLIB_API Mat4 Perspective(float Fov, float Aspect, float Near, float Far);
 

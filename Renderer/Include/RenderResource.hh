@@ -114,8 +114,6 @@ namespace SilverBell::Renderer
         VmaAllocationInfo AllocationInfo = {};
     };
 
-
-
     // 创建缓冲区，返回每个成员对应的缓冲区数组
     template<typename T, std::size_t I = ylt::reflection::members_count_v<T>>
     [[nodiscard]] std::vector<VMABufferCache> CreateBuffer(const T& iDataSource,
@@ -172,6 +170,7 @@ namespace SilverBell::Renderer
         return BufferCaches;
     }
 
+    // TODO : 这里不应该inline,记得整合
     [[nodiscard]] __FORCEINLINE std::vector<VMABufferCache> CreateBufferPack(size_t ValueSize,
         VmaAllocator MemoryAllocator,
         VkBufferUsageFlagBits VkBufferUsageFlagBits,
@@ -205,7 +204,6 @@ namespace SilverBell::Renderer
         }
         return BufferCaches;
     }
-
 
     struct VMAImgCreateInfo
     {

@@ -1,11 +1,18 @@
 #pragma once
 
+#include "InternalLibMarco.hh"
+
 #include "DirectedGraph.hh"
 
 #include <queue>
 #include <stack>
 #include <string>
 #include <vector>
+
+// 
+template<typename Args>
+concept SearchStruct = requires { typename Args::Container; }
+                    && requires { Args::GetTop(std::declval<typename Args::Container>()); };
 
 namespace SilverBell::Algorithm
 {
@@ -46,8 +53,7 @@ namespace SilverBell::Algorithm
     // 定义枚举类的位运算符 来自Falcor
     FALCOR_ENUM_CLASS_OPERATORS(IDirectedGraphTraversal::Flags);
 
-    template<typename Args>
-        requires requires { typename Args::Container; }&& requires { Args::GetTop(std::declval<typename Args::Container>()); }
+    template<SearchStruct Args>
     class TDirectedGraphTraversal : public IDirectedGraphTraversal
     {
     public:

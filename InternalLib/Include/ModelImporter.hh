@@ -1,7 +1,7 @@
 #pragma once
 
+#include <memory>
 #include <string_view>
-#include <optional>
 
 #include "InternalLibMarco.hh"
 
@@ -21,7 +21,7 @@ namespace SilverBell
         FModelImporter() = delete;
         ~FModelImporter() = delete;
 
-        static Model* ImporterModel(std::string_view FilePath);
+        static std::unique_ptr<Model> ImporterModel(std::string_view FilePath);
 
     };
 

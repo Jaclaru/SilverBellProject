@@ -148,12 +148,6 @@ FVulkanRenderer::FVulkanRenderer() :
 FVulkanRenderer::~FVulkanRenderer()
 {
     CleanUp();
-
-    if (LoadedModel)
-    {
-        delete LoadedModel;
-        LoadedModel = nullptr;
-    }
 }
 
 void FVulkanRenderer::SetRequiredInstanceExtensions(const char** Exts, int Len)
@@ -943,12 +937,11 @@ void FVulkanRenderer::CreateTextureSampler()
 
 void FVulkanRenderer::CreateVertexBuffers()
 {
-    auto Model = FModelImporter::ImporterModel("Assets/Models/viking_room.obj");
+    LoadedModel = FModelImporter::ImporterModel("Assets/Models/viking_room.obj");
 
-    if (Model == nullptr)return;;
+    if (LoadedModel == nullptr)return;
 
-    LoadedModel = Model;
-    const auto& Mesh = Model->MeshData;
+    const auto& Mesh = LoadedModel->MeshData;
 
     // 创建临时缓冲区
     StagingBufferCaches = CreateBuffer(Mesh, MemoryAllocator, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,

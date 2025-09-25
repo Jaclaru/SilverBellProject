@@ -6,7 +6,7 @@
 
 using namespace SilverBell;
 
-Model* FModelImporter::ImporterModel(std::string_view FilePath)
+std::unique_ptr<Model> FModelImporter::ImporterModel(std::string_view FilePath)
 {
     tinyobj::attrib_t Attributes;
     std::vector<tinyobj::shape_t> Shapes;
@@ -23,7 +23,7 @@ Model* FModelImporter::ImporterModel(std::string_view FilePath)
     }
 
     uint32_t SizeCount = 0;
-    Model* ImportedModel = new Model;
+    auto ImportedModel = std::make_unique<Model>();
     for (const auto& Shape : Shapes)
     {
         SizeCount += static_cast<uint32_t>(Shape.mesh.indices.size());
@@ -62,5 +62,5 @@ Model* FModelImporter::ImporterModel(std::string_view FilePath)
         }
     }
 
-    return ImportedModel;
+    return std::move(ImportedModel);
 }

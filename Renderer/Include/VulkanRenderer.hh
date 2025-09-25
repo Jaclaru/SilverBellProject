@@ -219,7 +219,7 @@ namespace SilverBell::Renderer
         VmaAllocator MemoryAllocator;
 
         // 模型
-        Model* LoadedModel = nullptr;
+        std::unique_ptr<Model> LoadedModel;
     };
 }
 
