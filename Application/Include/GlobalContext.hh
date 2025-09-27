@@ -6,7 +6,7 @@ namespace SilverBell::Application
 {
     class FApplication;
 
-    class GlobalContext : public NonCopyable, public NonMovable
+    class GlobalContext : public NonCopyable
     {
     public:
         static GlobalContext& Instance();

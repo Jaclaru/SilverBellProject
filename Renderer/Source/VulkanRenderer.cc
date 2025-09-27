@@ -691,8 +691,22 @@ void FVulkanRenderer::CreateRenderPass()
 void FVulkanRenderer::CreateGraphicsPipeline()
 {
     // 创建着色器模块
-    auto FragmentShaderModule = FShaderManager::Instance().CreateShaderModule("Assets/Shaders/Triangle/SPIR-V/TrianglePS.spv", LogicalDevice);
-    auto VertexShaderModule = FShaderManager::Instance().CreateShaderModule("Assets/Shaders/Triangle/SPIR-V/TriangleVS.spv", LogicalDevice);
+    FShader::ShaderDesc VertexShaderDesc =
+    {
+        .FilePath = "Assets/Shaders/Triangle/HLSL/TriangleVS.hlsl",
+        .EntryPoint = "Main",
+        .ShaderStage = VK_SHADER_STAGE_VERTEX_BIT,
+        .Defines = {}
+    };
+    FShader::ShaderDesc FragmentShaderDesc =
+    {
+        .FilePath = "Assets/Shaders/Triangle/HLSL/TrianglePS.hlsl",
+        .EntryPoint = "Main",
+        .ShaderStage = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .Defines = {}
+    };
+    auto FragmentShaderModule = FShaderManager::Instance().CreateShaderModule(FragmentShaderDesc, LogicalDevice);
+    auto VertexShaderModule = FShaderManager::Instance().CreateShaderModule(VertexShaderDesc, LogicalDevice);
     VkPipelineShaderStageCreateInfo VertexShaderStageInfo = {};
     VertexShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     VertexShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;

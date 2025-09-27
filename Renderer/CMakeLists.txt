@@ -23,4 +23,14 @@ message(STATUS "Vulkan_INCLUDE_DIR: ${Vulkan_INCLUDE_DIR}")
 target_link_libraries(Renderer PUBLIC InternalLib)
 target_link_libraries(Renderer PRIVATE ${Vulkan_LIBRARIES})
 
+# Vulkan SDK 环境变量
+set(VULKAN_SDK $ENV{VULKAN_SDK})
+
+# dxc 头文件和库路径
+set(DXC_LIB_DIR "${VULKAN_SDK}/Lib")
+set(DXC_LIB "${DXC_LIB_DIR}/dxcompiler.lib")
+
+# 链接 dxcompiler.lib
+target_link_libraries(Renderer PRIVATE ${DXC_LIB})
+
 endif()

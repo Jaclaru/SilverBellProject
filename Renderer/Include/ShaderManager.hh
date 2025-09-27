@@ -7,17 +7,19 @@
 
 #include <Volk/volk.h>
 
+#include <Mixins.hh>
+#include <unordered_set>
+
+#include "Shader.hh"
+
 namespace SilverBell::Renderer
 {
-    class FShaderManager
+    class FShaderManager : public NonCopyable
     {
     public:
-
         static FShaderManager& Instance();
 
-        void CompileHLSL2SPIRV(const std::string& FilePath, const std::string& EntryPoint, const std::string& ShaderModel, uint32_t ShaderType);
-
-        VkShaderModule CreateShaderModule(const std::string& FilePath, VkDevice LogicDevice);
+        VkShaderModule CreateShaderModule(const FShader::ShaderDesc& Desc, VkDevice LogicDevice);
 
     private:
         struct ShaderModuleCache
@@ -37,14 +39,7 @@ namespace SilverBell::Renderer
 
         FShaderManager() = default;
         ~FShaderManager() = default;
-        // 禁用拷贝构造和赋值操作
-        FShaderManager(const FShaderManager&) = delete;
-        FShaderManager& operator=(const FShaderManager&) = delete;
-        // 移动构造和赋值操作
-        FShaderManager(FShaderManager&&) = delete;
-        FShaderManager& operator=(FShaderManager&&) = delete;
 
-        std::unordered_map<VkDevice, ShaderModuleCache> ShaderCache;
-
+        //std::unordered_set<FShader> ShaderCache;
     };
 }

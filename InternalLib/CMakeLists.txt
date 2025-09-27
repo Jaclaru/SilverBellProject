@@ -20,5 +20,8 @@ target_link_libraries(InternalLib PUBLIC  debug spdlogd optimized spdlog)
 # stb
 target_include_directories(InternalLib PRIVATE ${STB_INCLUDE_DIR}) # 不需要暴露给外部
 
-# stb
+# tinyobjloader
 target_include_directories(InternalLib PRIVATE ${TINYOBJLOADER_INCLUDE_DIR})
+
+# xxHash
+target_include_directories(InternalLib PRIVATE ${XXHASH_INCLUDE_DIR})

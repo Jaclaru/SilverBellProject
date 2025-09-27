@@ -16,7 +16,7 @@ namespace SilverBell
     };
 
     class INTERNALLIB_API BeforeRenderEvent : public TMP::GenericCallbackSystem<std::variant<TimeInfo*>>,  // NOLINT(cppcoreguidelines-special-member-functions)
-                                              public NonCopyable, public NonMovable
+                                              public NonCopyable
     {
     public:
         static BeforeRenderEvent& Instance();
