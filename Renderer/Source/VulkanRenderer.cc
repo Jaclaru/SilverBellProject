@@ -691,14 +691,14 @@ void FVulkanRenderer::CreateRenderPass()
 void FVulkanRenderer::CreateGraphicsPipeline()
 {
     // 创建着色器模块
-    FShader::ShaderDesc VertexShaderDesc =
+   ShaderDesc VertexShaderDesc =
     {
         .FilePath = "Assets/Shaders/Triangle/HLSL/TriangleVS.hlsl",
         .EntryPoint = "Main",
         .ShaderStage = VK_SHADER_STAGE_VERTEX_BIT,
         .Defines = {}
     };
-    FShader::ShaderDesc FragmentShaderDesc =
+    ShaderDesc FragmentShaderDesc =
     {
         .FilePath = "Assets/Shaders/Triangle/HLSL/TrianglePS.hlsl",
         .EntryPoint = "Main",

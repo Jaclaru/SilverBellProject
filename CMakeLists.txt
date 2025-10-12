@@ -109,6 +109,15 @@ set(TINYOBJLOADER_INCLUDE_DIR "${THIRD_PARTY_DIR}/tinyobjloader/Include" CACHE I
 # xxHash
 set(XXHASH_INCLUDE_DIR "${THIRD_PARTY_DIR}/xxHash/Include" CACHE INTERNAL "xxHash Include")
 
+# SPIRV-Reflect 要作为子目录编译
+FetchContent_Declare(
+    SPIRV-Reflect
+    GIT_REPOSITORY https://github.com/KhronosGroup/SPIRV-Reflect.git
+    GIT_TAG vulkan-sdk-1.4.313.0 
+    GIT_SHALLOW 1
+)
+FetchContent_MakeAvailable(SPIRV-Reflect)
+
 ########################## 子目录 ##########################
 add_subdirectory(Application)
 add_subdirectory(Renderer)

@@ -1,16 +1,12 @@
 #pragma once
 
-#include <filesystem>
-#include <unordered_map>
-
-#include <string>
+#include "Mixins.hh"
+#include "Shader.hh"
 
 #include <Volk/volk.h>
 
-#include <Mixins.hh>
-#include <unordered_set>
-
-#include "Shader.hh"
+#include <memory>
+#include <unordered_map>
 
 namespace SilverBell::Renderer
 {
@@ -19,27 +15,16 @@ namespace SilverBell::Renderer
     public:
         static FShaderManager& Instance();
 
-        VkShaderModule CreateShaderModule(const FShader::ShaderDesc& Desc, VkDevice LogicDevice);
+        VkShaderModule CreateShaderModule(const ShaderDesc& Desc, VkDevice LogicDevice);
+
+        const FShader& GetOrCreateShader(const ShaderDesc& Desc);
 
     private:
-        struct ShaderModuleCache
-        {
-            ~ShaderModuleCache()
-            {
-                for (auto item : Cache)
-                {
-                    vkDestroyShaderModule(LogicDevice, item.second, nullptr);
-                }
-            }
-
-            VkDevice LogicDevice;
-            // 缓存：key为文件路径，value为VkShaderModule
-            std::unordered_map<std::string, VkShaderModule> Cache;
-        };
-
         FShaderManager() = default;
         ~FShaderManager() = default;
 
-        //std::unordered_set<FShader> ShaderCache;
+        void ReflectShader(FShader& oShader);
+
+        std::unordered_map<uint64_t, std::unique_ptr<FShader>> ShaderCache;
     };
 }

@@ -1,5 +1,7 @@
 #include "Shader.hh"
 
+#include "Hash.hh"
+
 using namespace SilverBell::Renderer;
 
 FShader::FShader(ShaderDesc IDesc)
@@ -8,3 +10,7 @@ FShader::FShader(ShaderDesc IDesc)
     //BinaryHash = Algorithm::HashFunction::Hash64(SPIRVData.data(), static_cast<std::uint32_t>(SPIRVData.size() * sizeof(uint32_t)));
 }
     
+std::uint64_t ShaderDesc::GetHashValue() const
+{
+    return Algorithm::HashFunction::HashCombine(*this);
+}

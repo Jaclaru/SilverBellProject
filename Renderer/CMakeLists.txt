@@ -30,7 +30,7 @@ set(VULKAN_SDK $ENV{VULKAN_SDK})
 set(DXC_LIB_DIR "${VULKAN_SDK}/Lib")
 set(DXC_LIB "${DXC_LIB_DIR}/dxcompiler.lib")
 
-# 链接 dxcompiler.lib
-target_link_libraries(Renderer PRIVATE ${DXC_LIB})
+# 链接 dxcompiler.lib 和 spirv-reflect-static 库
+target_link_libraries(Renderer PRIVATE ${DXC_LIB} spirv-reflect-static)
 
 endif()
