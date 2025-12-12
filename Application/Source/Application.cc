@@ -3,10 +3,11 @@
 #include "GlobalContext.hh"
 #include "RendererWindow.hh"
 
-using namespace SilverBell::Application;
 #include <QVulkanWindow>
 #include <QTimer>
 #include <QProcess>
+
+using namespace SilverBell::Application;
 
 FApplication::FApplication()
     : QMainWindow()

@@ -1,7 +1,7 @@
 #include "ModelImporter.hh"
 
 #define TINYOBJLOADER_IMPLEMENTATION
-#include <spdlog/spdlog.h>
+#include "Logger.hh"
 #include <tinyobjloader/tiny_obj_loader.h>
 
 using namespace SilverBell;
@@ -18,7 +18,7 @@ Model* FModelImporter::ImporterModel(std::string_view FilePath)
 
     if (!tinyobj::LoadObj(&Attributes, &Shapes, &Materials, &Warn, &Error, FullPath.c_str()))
     {
-        spdlog::error("模型加载失败: {}, {}", Warn, Error);
+        LOG_WARN("模型加载失败: {}, {}", Warn, Error);
         return nullptr;
     }
 

@@ -1,19 +1,18 @@
 #include "ShaderManager.hh"
 
+#include "Logger.hh"
 #include "RendererMarco.hh"
-
-#include <Windows.h>
-#include <wrl.h>
-#include <dxc/dxcapi.h>
 
 #include <Volk/volk.h>
 
-#include <spdlog/spdlog.h>
+#include <Windows.h> // Windows头文件必须在dxcapi.h之前包含
+#include <wrl.h>
+#include <dxc/dxcapi.h>
+
+#include "spirv_reflect.h"
 
 #include <fstream>
 #include <span>
-
-#include "spirv_reflect.h"
 
 using namespace SilverBell::Renderer;
 
@@ -33,7 +32,7 @@ namespace
 
         if (!File.is_open())
         {
-            spdlog::error("打开文件失败: {}", FilePath);
+            LOG_ERROR("打开文件失败: {}", FilePath);
             throw std::runtime_error("Failed to open file: " + FilePath);
         }
 
@@ -42,7 +41,7 @@ namespace
         File.seekg(0);
         if (!File.read(Buffer.data(), Size))
         {
-            spdlog::error("读入文件失败: {}", FilePath);
+            LOG_ERROR("读入文件失败: {}", FilePath);
             throw std::runtime_error("Failed to read file: " + FilePath);
         }
         File.close();
@@ -93,7 +92,7 @@ std::vector<uint32_t> CompileHLSLToSPIRV(const std::span<char> SourceCode, std::
     {
         ComPtr<IDxcBlobUtf8> Errors;
         Results->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&Errors), nullptr);
-        spdlog::error("HLSL编译失败: {}", Errors->GetStringPointer());
+        LOG_ERROR("HLSL编译失败: {}", Errors->GetStringPointer());
         throw std::runtime_error(Errors->GetStringPointer());
     }
 
@@ -123,7 +122,7 @@ VkShaderModule FShaderManager::CreateShaderModule(const ShaderDesc& Desc, const 
     VkShaderModule ShaderModule;
     if (vkCreateShaderModule(LogicDevice, &CreateInfo, nullptr, &ShaderModule) != VK_SUCCESS)
     {
-        spdlog::error("创建着色器模块失败，失败文件: {}", Desc.FilePath.string());
+        LOG_ERROR("创建着色器模块失败，失败文件: {}", Desc.FilePath.string());
         throw std::runtime_error("Failed to create shader module from file: " + Desc.FilePath.string());
     }
 
@@ -154,7 +153,7 @@ const FShader& FShaderManager::GetOrCreateShader(const ShaderDesc& Desc)
         WShaderModel = L"ps_6_0";
         break;
     default:
-        spdlog::error("错误的着色器阶段！");
+        LOG_ERROR("错误的着色器阶段！");
     }
 
     // 入口点
@@ -184,7 +183,7 @@ const FShader& FShaderManager::GetOrCreateShader(const ShaderDesc& Desc)
     SpvReflectResult Result = spvReflectCreateShaderModule(Shader->SPIRVData.size() * sizeof(uint32_t), Shader->SPIRVData.data(), &Module);
     if (Result != SPV_REFLECT_RESULT_SUCCESS)
     {
-        spdlog::error("SPIR-V反射创建失败，失败文件: {}", CompletePath);
+        LOG_ERROR("SPIR-V反射创建失败，失败文件: {}", CompletePath);
         throw std::runtime_error("Failed to reflect shader module from file: " + CompletePath);
     }
 

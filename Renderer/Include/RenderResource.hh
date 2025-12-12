@@ -1,6 +1,6 @@
 #pragma once
 
-#include <spdlog/spdlog.h>
+#include "Logger.hh"
 
 #include <Volk/volk.h>
 #include <vma/vk_mem_alloc.h>
@@ -51,7 +51,7 @@ namespace SilverBell::Renderer
             auto Finder = VkFormatMap.find(ValueSize);
             if (Finder == VkFormatMap.end())
             {
-                spdlog::warn("不支持的顶点属性格式！");
+                LOG_WARN("不支持的顶点属性格式！");
             }
             AttributeDescriptions[Index].format = Finder != VkFormatMap.end()
                 ? static_cast<VkFormat>(Finder->second) : VK_FORMAT_R32G32B32A32_SFLOAT; // TODO: 根据类型动态设置
@@ -163,7 +163,7 @@ namespace SilverBell::Renderer
                     &BufferCache.Allocation,
                     &BufferCache.AllocationInfo) != VK_SUCCESS)
                 {
-                    spdlog::error("创建缓冲区失败！");
+                    LOG_ERROR("创建缓冲区失败！");
                     throw std::runtime_error("Failed to create buffer!");
                 }
             }
@@ -200,7 +200,7 @@ namespace SilverBell::Renderer
             &BufferCache.Allocation,
             &BufferCache.AllocationInfo) != VK_SUCCESS)
         {
-            spdlog::error("创建缓冲区失败！");
+            LOG_ERROR("创建缓冲区失败！");
             throw std::runtime_error("Failed to create buffer!");
         }
         return BufferCaches;
@@ -261,7 +261,7 @@ namespace SilverBell::Renderer
             &ImageCache.Allocation,
             &ImageCache.AllocationInfo) != VK_SUCCESS)
         {
-            spdlog::error("创建图片失败！");
+            LOG_ERROR("创建图片失败！");
             throw std::runtime_error("Failed to create Image!");
         }
 

@@ -2,7 +2,7 @@
 
 #include "FunctionTraits.hh"
 
-#include <spdlog/spdlog.h>
+#include "Logger.hh"
 
 #include <vector>
 #include <variant>
@@ -84,7 +84,7 @@ namespace SilverBell::TMP
                         }
                         catch (const std::exception& E)
                         {
-                            spdlog::warn("回调函数异常：{}", E.what());
+                            LOG_WARN("回调函数异常：{}", E.what());
                             throw std::runtime_error("回调函数异常：" + std::string(E.what()));
                         }
                     }
@@ -109,7 +109,7 @@ namespace SilverBell::TMP
                 }
                 catch (const std::exception& E)
                 {
-                    spdlog::error("回调函数出错：{}", E.what());
+                    LOG_ERROR("回调函数出错：{}", E.what());
                 }
             }
         }
@@ -129,7 +129,7 @@ namespace SilverBell::TMP
         {
             if (Index >= Params.size()) 
             {
-                spdlog::error("参数索引超出范围！");
+                LOG_ERROR("参数索引超出范围！");
                 throw std::out_of_range("Parameter index out of range");
             }
             try 
@@ -138,6 +138,7 @@ namespace SilverBell::TMP
             }
             catch (const std::bad_variant_access&) 
             {
+                LOG_ERROR("参数类型不匹配！");
                 throw std::runtime_error("Parameter type mismatch");
             }
         }
@@ -149,6 +150,7 @@ namespace SilverBell::TMP
         {
             if (Index >= Params.size()) 
             {
+                LOG_DEBUG("参数索引超出范围！");
                 return false;
             }
             return std::holds_alternative<T>(Params[Index]);
@@ -203,7 +205,7 @@ namespace SilverBell::TMP
                     return std::get<TNoRef>(Param);
                 }
             }
-            spdlog::error("参数类型不匹配，提取失败！");
+            LOG_ERROR("参数类型不匹配，提取失败！");
             throw std::runtime_error("Parameter type mismatch!");
         }
 

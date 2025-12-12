@@ -1,12 +1,12 @@
 #pragma once
 
+#include "BeforeRender.hh"
+
 #include <QThread>
 #include <QWindow>
 #include <QWidget>
 
 #include <memory>
-
-#include "BeforeRender.hh"
 
 namespace SilverBell::Renderer
 {

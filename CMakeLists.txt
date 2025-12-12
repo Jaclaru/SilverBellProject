@@ -47,10 +47,6 @@ endif()
 # 设置项目根目录宏，方便在代码中使用
 add_compile_definitions(PROJECT_ROOT_PATH="${CMAKE_SOURCE_DIR}/")
 
-# spdlog 使用动态库
-add_compile_definitions(SPDLOG_COMPILED_LIB)
-
-
 # 判断当前的构建版本
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(BUILD_HINT Debug)
@@ -81,11 +77,9 @@ find_package(Qt6 COMPONENTS Core Gui Widgets REQUIRED)
 set(CMAKE_AUTOMOC ON)
 
 # spdlog
-set(SPDLOG_INCLUDE_DIR "${THIRD_PARTY_DIR}/spdlog-1.15.3/Include" CACHE INTERNAL "spdlog Include")
-set(SPDLOG_LIBRARY_DIR "${THIRD_PARTY_DIR}/spdlog-1.15.3/${THIRD_PARTY_LIB_DIR}" CACHE INTERNAL "spdlog Library")
-file(GLOB SPDLOG_DLL_FILES ${SPDLOG_LIBRARY_DIR}/*.dll)
-message("spdlog库文件位置: ${SPDLOG_LIBRARY_DIR}")
-message("spdloag库头文件位置: ${SPDLOG_INCLUDE_DIR}")
+set(spdlog_DIR "${THIRD_PARTY_DIR}/spdlog/${OPT_HINT}/lib/cmake/spdlog" CACHE INTERNAL "spdlog CMake directory")
+message("spdlog_DIR: ${spdlog_DIR}")
+find_package(spdlog REQUIRED)
 
 # Eigen
 set(EIGEN_INCLUDE_DIR "${THIRD_PARTY_DIR}/Eigen/Include" CACHE INTERNAL "Eigen Include")

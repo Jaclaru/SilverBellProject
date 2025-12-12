@@ -1,4 +1,3 @@
-
 #define VOLK_IMPLEMENTATION
 
 #define VMA_VULKAN_VERSION 1001000
@@ -10,22 +9,15 @@
 
 #define USE_VULKAN_VERSION VK_API_VERSION_1_1
 
+#include "ImageImporter.hh"
+#include "Logger.hh"
+#include "ModelImporter.hh"
+#include "ShaderManager.hh"
+
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 
 #include <Windows.h>
 #endif  
-
-#include <iostream>
-#include <limits>
-#include <unordered_set>
-#include <vector>
-
-#include "ImageImporter.hh"
-#include "ShaderManager.hh"
-
-#include <spdlog/spdlog.h>
-
-#include "ModelImporter.hh"
 
 using namespace SilverBell::Renderer;
 
@@ -67,7 +59,7 @@ namespace
                 const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
                 void* pUserData) -> VkBool32
             {
-                std::cerr << "validation layer: " << pCallbackData->pMessage << '\n';
+                LOG_ERROR("Vulkan Validation Layer: {}", pCallbackData->pMessage);
 
                 return VK_FALSE;
             };
@@ -239,13 +231,13 @@ bool FVulkanRenderer::DrawFrame()
             switch (LastError)  // NOLINT(clang-diagnostic-switch-enum)
             {
             case VK_ERROR_OUT_OF_DATE_KHR:
-                spdlog::warn("交换链过时，需要重新创建！已停止渲染！");
+                LOG_WARN("交换链过时，需要重新创建！已停止渲染！");
                 break;
             case VK_SUBOPTIMAL_KHR:
-                spdlog::warn("交换链仍然可以向surface提交图像，但是surface的属性不再匹配准确！");
+                LOG_WARN("交换链仍然可以向surface提交图像，但是surface的属性不再匹配准确！");
                 break;
             default:
-                spdlog::error("交换链发生未知错误！");
+                LOG_ERROR("交换链发生未知错误！");
             }
         }
         return false;
@@ -265,7 +257,7 @@ bool FVulkanRenderer::DrawFrame()
     SubmitInfo.pSignalSemaphores = SignalSemaphores;
     if (vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE) != VK_SUCCESS)
     {
-        spdlog::error("提交绘制命令缓冲区失败！");
+        LOG_ERROR("提交绘制命令缓冲区失败！");
         throw std::runtime_error("Failed to submit draw command buffer!");
     }
 
@@ -288,7 +280,7 @@ void FVulkanRenderer::CreateInstance()
 {
     if (volkInitialize() != VK_SUCCESS)
     {
-        spdlog::error("Volk初始化失败！");
+        LOG_ERROR("Volk初始化失败！");
         return;
     }
 
@@ -297,7 +289,7 @@ void FVulkanRenderer::CreateInstance()
         if (!CheckValidationLayerSupport())
         {
             // 失败日志
-            spdlog::error("检查校验层支持失败！");
+            LOG_ERROR("检查校验层支持失败！");
             return;
         }
     }
@@ -336,7 +328,7 @@ void FVulkanRenderer::CreateInstance()
     VkResult Result = vkCreateInstance(&InstanceCreateInfo, nullptr, &Instance);
     if (Result != VK_SUCCESS)
     {
-        spdlog::error("创建Vulkan实例失败，程序退出！");
+        LOG_ERROR("创建Vulkan实例失败，程序退出！");
         std::exit(0);
     }
 
@@ -355,7 +347,7 @@ void FVulkanRenderer::CreateSurface(void* WindowHandle)
     SurfaceCreateInfo.hwnd = reinterpret_cast<HWND>(WindowHandle);
     if (vkCreateWin32SurfaceKHR(Instance, &SurfaceCreateInfo, nullptr, &Surface) != VK_SUCCESS)
     {
-        spdlog::error("创建Vulkan Surface失败！");
+        LOG_ERROR("创建Vulkan Surface失败！");
     }
 
 #endif
@@ -368,7 +360,7 @@ void FVulkanRenderer::PickPhysicalDevice()
     vkEnumeratePhysicalDevices(Instance, &DeviceCount, nullptr);
     if (DeviceCount == 0)
     {
-        spdlog::error("未找到兼容Vulkan的设备！");
+        LOG_ERROR("未找到兼容Vulkan的设备！");
         return;
     }
     std::vector<VkPhysicalDevice> Devices(DeviceCount);
@@ -387,7 +379,7 @@ void FVulkanRenderer::PickPhysicalDevice()
 
     if (PhysicalDevice == VK_NULL_HANDLE)
     {
-        spdlog::error("未找到合适的GPU！");
+        LOG_ERROR("未找到合适的GPU！");
     }
 }
 
@@ -424,7 +416,7 @@ bool FVulkanRenderer::CheckValidationLayerSupport()
     vkEnumerateInstanceLayerProperties(&LayerCount, nullptr);
     if (LayerCount == 0)
     {
-        spdlog::error("不支持任何验证层！");
+        LOG_ERROR("不支持任何验证层！");
         return false;
     }
     std::vector<VkLayerProperties> AvailableLayers(LayerCount);
@@ -446,7 +438,7 @@ bool FVulkanRenderer::CheckValidationLayerSupport()
         // 输出缺失的验证层
         for (const auto& LayerName : RequiredLayers)
         {
-            spdlog::error("缺失验证层: {}", LayerName);
+            LOG_ERROR("缺失验证层: {}", LayerName);
         }
         return false;
     }
@@ -475,7 +467,7 @@ bool FVulkanRenderer::CheckDeviceExtensionSupport(VkPhysicalDevice Device)
         // 输出缺失的设备扩展
         for (const auto& ExtensionName : RequiredExtensions)
         {
-            spdlog::error("缺失设备扩展: {}", ExtensionName);
+            LOG_ERROR("缺失设备扩展: {}", ExtensionName);
         }
         return false;
     }
@@ -486,7 +478,7 @@ void FVulkanRenderer::SetupDebugMessenger()
     VkDebugUtilsMessengerCreateInfoEXT DebugCreateInfo = GetDebugMessengerCreateInfo();
     if (vkCreateDebugUtilsMessengerEXT(Instance, &DebugCreateInfo, nullptr, &DebugMessenger) != VK_SUCCESS)
     {
-        spdlog::error("创建Vulkan调试消息失败！");
+        LOG_ERROR("创建Vulkan调试消息失败！");
     }
 }
 
@@ -496,7 +488,7 @@ void FVulkanRenderer::CreateLogicalDevice()
     QueueFamilyIndices FamilyIndices = FindQueueFamilies(PhysicalDevice);
     if (!FamilyIndices.IsComplete())
     {
-        spdlog::error("需求的队列族索引不完整，无法创建逻辑设备！");
+        LOG_ERROR("需求的队列族索引不完整，无法创建逻辑设备！");
         throw std::runtime_error("Queue family indices are not complete!");
     }
     float QueuePriority = 1.0f;
@@ -544,7 +536,7 @@ void FVulkanRenderer::CreateLogicalDevice()
 
     if (vkCreateDevice(PhysicalDevice, &DeviceCreateInfo, nullptr, &LogicalDevice) != VK_SUCCESS)
     {
-        spdlog::error("创建逻辑设备失败！");
+        LOG_ERROR("创建逻辑设备失败！");
         throw std::runtime_error("Failed to create logical device!");
     }
     if (QueueCreateInfos.size() == 1)
@@ -568,7 +560,7 @@ void FVulkanRenderer::CreateSwapChain(int Width, int Height)
     SwapChainSupportDetails SwapChainDetails = QuerySwapChainSupport(PhysicalDevice);
     if (SwapChainDetails.Formats.empty() || SwapChainDetails.PresentModes.empty())
     {
-        spdlog::error("交换链支持详情不可用！");
+        LOG_ERROR("交换链支持详情不可用！");
         throw std::runtime_error("Swap chain details are not available!");
     }
     VkSurfaceFormatKHR SurfaceFormat = ChooseSwapSurfaceFormat(SwapChainDetails.Formats);
@@ -611,7 +603,7 @@ void FVulkanRenderer::CreateSwapChain(int Width, int Height)
     SwapChainCreateInfo.oldSwapchain = VK_NULL_HANDLE; // 如果是第一次创建交换链，设置为VK_NULL_HANDLE
     if (vkCreateSwapchainKHR(LogicalDevice, &SwapChainCreateInfo, nullptr, &SwapChain) != VK_SUCCESS)
     {
-        spdlog::error("创建交换链失败！");
+        LOG_ERROR("创建交换链失败！");
         throw std::runtime_error("Failed to create swap chain!");
     }
 
@@ -684,6 +676,7 @@ void FVulkanRenderer::CreateRenderPass()
     RenderPassInfo.pDependencies = &Dependency;
     if (vkCreateRenderPass(LogicalDevice, &RenderPassInfo, nullptr, &RenderPass) != VK_SUCCESS)
     {
+        LOG_ERROR("创建渲染通道失败！");
         throw std::runtime_error("Failed to create render pass!");
     }
 }
@@ -825,7 +818,7 @@ void FVulkanRenderer::CreateGraphicsPipeline()
     PipelineLayoutInfo.pPushConstantRanges = nullptr; // 没有推送常量范围
     if (vkCreatePipelineLayout(LogicalDevice, &PipelineLayoutInfo, nullptr, &PipelineLayout) != VK_SUCCESS)
     {
-        spdlog::error("创建管线布局失败！");
+        LOG_ERROR("创建管线布局失败！");
         throw std::runtime_error("Failed to create pipeline layout!");
     }
 
@@ -850,7 +843,7 @@ void FVulkanRenderer::CreateGraphicsPipeline()
     if (vkCreateGraphicsPipelines(LogicalDevice, VK_NULL_HANDLE, 1, &PipelineCreateInfo,
         nullptr, &GraphicsPipeline)!= VK_SUCCESS)
     {
-        spdlog::error("创建图形管线失败！");
+        LOG_ERROR("创建图形管线失败！");
         throw std::runtime_error("Failed to create graphics pipeline!");
     }
 }
@@ -860,7 +853,7 @@ void FVulkanRenderer::CreateCommandPool()
     QueueFamilyIndices FamilyIndices = FindQueueFamilies(PhysicalDevice);
     if (!FamilyIndices.IsComplete())
     {
-        spdlog::error("需求的队列族索引不完整，无法创建命令池！");
+        LOG_ERROR("需求的队列族索引不完整，无法创建命令池！");
         throw std::runtime_error("Queue family indices are not complete!");
     }
     VkCommandPoolCreateInfo PoolCreateInfo = {};
@@ -869,7 +862,7 @@ void FVulkanRenderer::CreateCommandPool()
     PoolCreateInfo.queueFamilyIndex = FamilyIndices.GraphicsFamily.value(); // 使用图形队列族
     if (vkCreateCommandPool(LogicalDevice, &PoolCreateInfo, nullptr, &CommandPool) != VK_SUCCESS)
     {
-        spdlog::error("创建命令池失败！");
+        LOG_ERROR("创建命令池失败！");
         throw std::runtime_error("Failed to create command pool!");
     }
 }
@@ -951,7 +944,7 @@ void FVulkanRenderer::CreateTextureSampler()
     SamplerCreateInfo.maxLod = 0.0f; // 最大LOD
     if (vkCreateSampler(LogicalDevice, &SamplerCreateInfo, nullptr, &TextureSampler) != VK_SUCCESS)
     {
-        spdlog::error("创建纹理采样器失败！");
+        LOG_ERROR("创建纹理采样器失败！");
     }
 }
 
@@ -1062,7 +1055,7 @@ void FVulkanRenderer::CreateDescriptorPool()
     PoolCreateInfo.maxSets = 1; // 假设只需要一个描述符
     if (vkCreateDescriptorPool(LogicalDevice, &PoolCreateInfo, nullptr, &DescriptorPool) != VK_SUCCESS)
     {
-        spdlog::error("创建描述符池失败！");
+        LOG_ERROR("创建描述符池失败！");
         throw std::runtime_error("Failed to create descriptor pool!");
     }
 }
@@ -1076,7 +1069,7 @@ void FVulkanRenderer::CreateDescriptorSet()
     AllocateInfo.pSetLayouts = &DescriptorSetLayout;
     if (vkAllocateDescriptorSets(LogicalDevice, &AllocateInfo, &DescriptorSet) != VK_SUCCESS)
     {
-        spdlog::error("分配描述符集失败！");
+        LOG_ERROR("分配描述符集失败！");
         throw std::runtime_error("Failed to allocate descriptor set!");
     }
     VkDescriptorBufferInfo BufferInfo = {};
@@ -1119,7 +1112,7 @@ void FVulkanRenderer::CreateCommandBuffers()
     AllocateInfo.commandBufferCount = static_cast<uint32_t>(CommandBuffers.size());
     if (vkAllocateCommandBuffers(LogicalDevice, &AllocateInfo, CommandBuffers.data()) != VK_SUCCESS)
     {
-        spdlog::error("分配命令缓冲失败！");
+        LOG_ERROR("分配命令缓冲失败！");
         throw std::runtime_error("Failed to allocate command buffers!");
     }
     for (size_t Idx = 0; Idx < CommandBuffers.size(); ++Idx)
@@ -1130,7 +1123,7 @@ void FVulkanRenderer::CreateCommandBuffers()
         BeginInfo.pInheritanceInfo = nullptr; // 可选继承信息
         if (vkBeginCommandBuffer(CommandBuffers[Idx], &BeginInfo) != VK_SUCCESS)
         {
-            spdlog::error("开始录制命令缓冲失败！");
+            LOG_ERROR("开始录制命令缓冲失败！");
             throw std::runtime_error("Failed to begin recording command buffer!");
         }
 
@@ -1160,7 +1153,7 @@ void FVulkanRenderer::CreateCommandBuffers()
         vkCmdEndRenderPass(CommandBuffers[Idx]);
         if (vkEndCommandBuffer(CommandBuffers[Idx]) != VK_SUCCESS)
         {
-            spdlog::error("结束录制命令缓冲失败！");
+            LOG_ERROR("结束录制命令缓冲失败！");
             throw std::runtime_error("Failed to record command buffer!");
         }
     }
@@ -1173,7 +1166,7 @@ void FVulkanRenderer::CreateSemaphores()
     if (vkCreateSemaphore(LogicalDevice, &SemaphoreInfo, nullptr, &ImageAvailableSemaphore) != VK_SUCCESS ||
         vkCreateSemaphore(LogicalDevice, &SemaphoreInfo, nullptr, &RenderFinishedSemaphore) != VK_SUCCESS)
     {
-        spdlog::error("创建信号量失败！");
+        LOG_ERROR("创建信号量失败！");
         throw std::runtime_error("Failed to create semaphores!");
     }
 }
@@ -1234,7 +1227,7 @@ void FVulkanRenderer::CreateFramebuffers()
         CreateInfo.layers = 1;
         if (vkCreateFramebuffer(LogicalDevice, &CreateInfo, nullptr, &SwapChainFramebuffers[i]) != VK_SUCCESS)
         {
-            spdlog::error("创建帧缓冲失败！");
+            LOG_ERROR("创建帧缓冲失败！");
             throw std::runtime_error("Failed to create framebuffer!");
         }
     }
@@ -1264,7 +1257,7 @@ void FVulkanRenderer::CreateDescriptorSetLayout()
 
     if (vkCreateDescriptorSetLayout(LogicalDevice, &LayoutCreateInfo, nullptr, &DescriptorSetLayout) != VK_SUCCESS) 
     {
-        spdlog::error("创建描述符集布局失败！");
+        LOG_ERROR("创建描述符集布局失败！");
         throw std::runtime_error("failed to create descriptor set layout!");
     }
 }
@@ -1383,7 +1376,7 @@ void FVulkanRenderer::CreateMemoryAllocator()
 
     if (vmaCreateAllocator(&AllocatorCreateInfo, &MemoryAllocator) != VK_SUCCESS)
     {
-        spdlog::error("创建VMA分配器失败！");
+        LOG_ERROR("创建VMA分配器失败！");
     }
 }
 
@@ -1510,7 +1503,7 @@ void FVulkanRenderer::TransitionImageLayout(VkImage Image, VkFormat Format, VkIm
     }
     else 
     {
-        spdlog::error("不支持的图像布局转换！");
+        LOG_ERROR("不支持的图像布局转换！");
         throw std::invalid_argument("unsupported layout transition!");
     }
 
@@ -1535,7 +1528,8 @@ VkImageView FVulkanRenderer::CreateImageView(VkImage Image, VkFormat Format, VkI
     VkImageView ImageView;
     if (vkCreateImageView(LogicalDevice, &ViewInfo, nullptr, &ImageView) != VK_SUCCESS) 
     {
-        spdlog::error("创建纹理图像视图失败！");
+        LOG_ERROR("创建纹理图像视图失败！");
+        throw std::runtime_error("failed to create texture image view!");
     }
 
     return ImageView;
@@ -1557,6 +1551,6 @@ VkFormat FVulkanRenderer::FindSupportedFormat(const std::vector<VkFormat>& Candi
             return Format;
         }
     }
-    spdlog::error("找不到支持的格式！");
+    LOG_ERROR("找不到支持的格式！");
     throw std::runtime_error("failed to find supported format!");
 }

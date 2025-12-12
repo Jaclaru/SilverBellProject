@@ -1,7 +1,7 @@
 #pragma once
 
 #include "InternalLibMarco.hh"
-#include <spdlog/logger.h>
+#include "Logger.hh"
 
 #include <unordered_map>
 #include <unordered_set>
@@ -31,7 +31,7 @@ namespace SilverBell::Algorithm
         {
             if (NodeMap.find(NodeID) == NodeMap.end())
             {
-                spdlog::warn("节点ID不存在！");
+                LOG_WARN("节点ID不存在！");
                 return {};
             }
 
@@ -58,13 +58,13 @@ namespace SilverBell::Algorithm
         {
             if (!NodeMap.contains(SrcNode))
             {
-                spdlog::warn("无法添加一条边到有向图中，源节点ID不存在！");
+                LOG_WARN("无法添加一条边到有向图中，源节点ID不存在！");
                 return InvalidID;
             }
 
             if (!NodeMap.contains(DstNode))
             {
-                spdlog::warn("无法添加一条边到有向图中，目标节点ID不存在！");
+                LOG_WARN("无法添加一条边到有向图中，目标节点ID不存在！");
                 return InvalidID;
             }
 
@@ -79,7 +79,7 @@ namespace SilverBell::Algorithm
         {
             if (!EdgeMap.contains(EdgeId))
             {
-                spdlog::warn("无法添加一条边到有向图中，边的ID不存在！");
+                LOG_WARN("无法添加一条边到有向图中，边的ID不存在！");
                 return;
             }
 
@@ -140,7 +140,7 @@ namespace SilverBell::Algorithm
         {
             if (DoesNodeExist(NodeId) == false)
             {
-                spdlog::warn("DirectGraph::GetNode() 节点ID不存在！");
+                LOG_WARN("DirectGraph::GetNode() 节点ID不存在！");
                 return nullptr;
             }
             return &NodeMap.at(NodeId);
@@ -150,7 +150,7 @@ namespace SilverBell::Algorithm
         {
             if (DoesEdgeExist(EdgeId) == false)
             {
-                spdlog::warn("DirectGraph::GetEdge() 边ID不存在！");
+                LOG_WARN("DirectGraph::GetEdge() 边ID不存在！");
                 return nullptr;
             }
             return &EdgeMap.at(EdgeId);
@@ -185,6 +185,7 @@ namespace SilverBell::Algorithm
                     return;
                 }
             }
+            LOG_ERROR("在节点中未找到对应的边，移除失败！");
             throw std::runtime_error("Edge not found in node");
         }
 

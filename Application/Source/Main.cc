@@ -3,17 +3,19 @@
 
 #include <QApplication>
 
-#include <spdlog/spdlog.h>
+#include "Logger.hh"
 
 int main(int Argc, char** Argv)
 {
+    // 初始化日志
+	SilverBell::Utility::Logger::InitializeAsyncLogging();
+
     QApplication QApp(Argc, Argv);
 
     SilverBell::Application::FApplication Application;
     Application.show();
 
-    // 由于编译的spdlog动态库勾选了宽字符和utf-8支持，所以可以直接打印中文
-    spdlog::info("中文日志测试：{}", "你好，世界！");
+    LOG_INFO("中文日志测试：{}", "你好，世界！");
 
     return QApplication::exec();
 }

@@ -2,13 +2,12 @@
 
 #include "Application.hh"
 #include "GlobalContext.hh"
+#include "Logger.hh"
 #include "VulkanRenderer.hh"
 
 #include <QDateTime>
 #include <QVulkanInstance>
 #include <QTimer>
-
-#include <spdlog/spdlog.h>
 
 #include <unordered_set>
 
@@ -27,7 +26,7 @@ namespace
 }
 
 FRendererThread::FRendererThread(FVulkanRenderer* renderer, QObject* parent)
-    : QThread(parent), Renderer(renderer), bRunning(true)
+    : QThread(parent), Renderer(renderer), bRunning(true), NewWidth(0), NewHeight(0)
 {
     BeforeRenderEvent::Instance().SetParameter(0, &TimeInformation);
 
@@ -94,7 +93,7 @@ FRendererWindow::~FRendererWindow()
     {
         RenderThread->Stop();
         RenderThread->wait();
-        spdlog::info("渲染线程正常退出！");
+        LOG_INFO("渲染线程正常退出！");
     }
 }
 
@@ -144,7 +143,8 @@ void FRendererWindow::resizeEvent(QResizeEvent* Event)
     lastSize = size();
 
     // 使用定时器延迟处理，避免频繁触发
-    if (!ResizeTimer) {
+    if (!ResizeTimer) 
+    {
         ResizeTimer = new QTimer(this);
         ResizeTimer->setSingleShot(true);
         connect(ResizeTimer, &QTimer::timeout, this, &FRendererWindow::HandleResize);
@@ -162,7 +162,7 @@ void FRendererWindow::HandleResize()
     {
         RenderThread->RequestResize(this->width(), this->height());
     }
-    spdlog::info("窗口大小变化为：{} , {}", this->width(), this->height());
+    LOG_INFO("窗口大小变化为：{} , {}", this->width(), this->height());
 }
 
 void FRendererWindow::InitializeVulkanRenderer()
